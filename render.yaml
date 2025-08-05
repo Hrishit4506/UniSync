@@ -1,0 +1,11 @@
+services:
+  - type: web
+    name: unisync
+    env: python
+    buildCommand: pip install -r requirements.txt
+    startCommand: gunicorn app:app
+    plan: free
+    disk:
+      name: dataset-disk
+      mountPath: /home/render/app/dataset
+      sizeGB: 1
