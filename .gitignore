@@ -1,6 +1,39 @@
+# Byte-compiled / cache files
 __pycache__/
-*.pyc
-.env
+*.py[cod]
+*$py.class
+
+# Virtual environment
 venv/
+ENV/
+env/
+.venv/
+
+# Python egg files
+*.egg
+*.egg-info/
+dist/
+build/
+.eggs/
+
+# Flask-related
 instance/
 *.db
+*.sqlite3
+
+# Uploaded datasets (optional – remove this line if you want to track images)
+# dataset/
+
+# Logs and temp files
+*.log
+*.tmp
+
+# System files
+.DS_Store
+Thumbs.db
+
+# VS Code settings (if you use VS Code)
+.vscode/
+
+# Render logs and files
+*.pid
