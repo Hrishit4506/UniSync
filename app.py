@@ -46,6 +46,10 @@ ser = None
 
 db = SQLAlchemy(app)
 
+# Temporary or persistent storage for camera stream URL
+esp_stream_url = None
+
+
 # Initialize Flask-Login
 login_manager = LoginManager()
 login_manager.init_app(app)
@@ -1064,6 +1068,27 @@ def test_esp32_connection():
             'success': False,
             'error': str(e)
         })
+    
+@app.route('/register_cam', methods=['POST'])
+def register_cam():
+    global esp_stream_url
+    data = request.get_json()
+    url = data.get('stream_url')
+    if not url:
+        return jsonify({'status': 'error', 'message': 'No stream_url provided'}), 400
+    esp_stream_url = url
+    print(f"[ESP32] Registered stream URL: {esp_stream_url}")
+    return jsonify({'status': 'ok'}), 200
+
+@app.route('/view_stream')
+@login_required
+def view_stream():
+    global esp_stream_url
+    if not esp_stream_url:
+        flash("ESP32‑CAM hasn't registered yet.", 'warning')
+        return redirect(url_for('student_dashboard'))
+    return render_template('stream_view.html', stream_url=esp_stream_url)
+
 
 # ---------- ADMIN: Add initial admin user using shell ----------
 # from app import db, User
