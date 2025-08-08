@@ -1093,18 +1093,18 @@ def esp32_mark_attendance():
     except Exception as e:
         return jsonify({"status": "error", "message": str(e)})
 
-@app.route('/api/esp32/upload_image', methods=['POST'])
-def upload_image():
-    try:
-        image_data = request.data
-        filename = f"esp32_{int(time.time())}.jpg"
-        filepath = os.path.join("static/uploads", filename)
-        with open(filepath, "wb") as f:
-            f.write(image_data)
-        # TODO: Run your face recognition logic here
-        return jsonify({"status": "ok", "file": filename})
-    except Exception as e:
-        return jsonify({"status": "error", "message": str(e)})
+@app.route('/api/update_camera_stream', methods=['POST'])
+def update_camera_stream():
+    data = request.get_json()
+    url = data.get("stream_url")
+    if not url:
+        return jsonify(status="error", message="Missing stream_url"), 400
+    
+    # You can store it in a file
+    with open("camera_stream_url.txt", "w") as f:
+        f.write(url)
+    
+    return jsonify(status="ok", message="Stream URL updated")
 
 
 # ---------- ADMIN: Add initial admin user using shell ----------
