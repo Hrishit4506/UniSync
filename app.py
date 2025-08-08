@@ -31,7 +31,7 @@ DATASET_DIR = "dataset"
 FACE_SIZE = (100, 100)
 BUFFER_DURATION_SEC = 1.0
 CONFIDENCE_THRESHOLD = 120  # Lowered from 120 to make recognition more lenient
-current_stream_url = None
+latest_stream_url = None
 
 SERIAL_PORT = 'COM4'  # Arduino port
 SERIAL_BAUD = 9600
@@ -1103,12 +1103,14 @@ def esp32_mark_attendance():
     
 @app.route('/api/update_camera_stream', methods=['POST'])
 def update_camera_stream():
+    global latest_stream_url
     data = request.get_json()
-    stream_url = data.get("stream_url")
-
-    # Store in DB or global variable
-    print("Received stream URL:", stream_url)
-    return {"status": "success"}, 200
+    stream_url = data.get('stream_url')
+    if stream_url:
+        latest_stream_url = stream_url
+        return jsonify({"status": "success", "stream_url": latest_stream_url})
+    else:
+        return jsonify({"status": "error", "message": "No stream_url provided"}), 400
 
 
 
