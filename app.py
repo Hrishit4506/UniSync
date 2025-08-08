@@ -1044,50 +1044,54 @@ def check_new_attendance():
     except Exception as e:
         return jsonify({'error': str(e)}), 500
 
-@app.route('/test_esp32_connection')
-@login_required
-def test_esp32_connection():
-    """Test ESP32-CAM connection"""
-    if not (current_user.is_admin() or current_user.is_teacher()):
-        return jsonify({'error': 'Access denied'}), 403
-    
+@app.route('/api/esp32/mark_attendance', methods=['POST'])
+def esp32_mark_attendance():
     try:
-        response = requests.get(STREAM_URL, timeout=5)
-        return jsonify({
-            'esp32_ip': ESP32_IP,
-            'stream_url': STREAM_URL,
-            'status': response.status_code,
-            'success': response.status_code == 200,
-            'content_type': response.headers.get('content-type', 'unknown')
-        })
-    except Exception as e:
-        return jsonify({
-            'esp32_ip': ESP32_IP,
-            'stream_url': STREAM_URL,
-            'status': 'error',
-            'success': False,
-            'error': str(e)
-        })
-    
-@app.route('/register_cam', methods=['POST'])
-def register_cam():
-    global esp_stream_url
-    data = request.get_json()
-    url = data.get('stream_url')
-    if not url:
-        return jsonify({'status': 'error', 'message': 'No stream_url provided'}), 400
-    esp_stream_url = url
-    print(f"[ESP32] Registered stream URL: {esp_stream_url}")
-    return jsonify({'status': 'ok'}), 200
+        data = request.get_json()
+        student_id = data.get('id')   # Must match the username in your DB
+        name = data.get('name')       # For reference/logging
+        device = data.get('device', 'esp32-cam')
 
-@app.route('/view_stream')
-@login_required
-def view_stream():
-    global esp_stream_url
-    if not esp_stream_url:
-        flash("ESP32‑CAM hasn't registered yet.", 'warning')
-        return redirect(url_for('student_dashboard'))
-    return render_template('stream_view.html', stream_url=esp_stream_url)
+        if not student_id or not name:
+            return jsonify({"status": "error", "message": "Missing ID or name"}), 400
+
+        db_path = os.path.join('instance', 'User.db')
+        conn = sqlite3.connect(db_path)
+        c = conn.cursor()
+
+        # Check that table exists
+        table_name = f"attendance_{student_id}"
+        c.execute(f"SELECT name FROM sqlite_master WHERE type='table' AND name=?", (table_name,))
+        if not c.fetchone():
+            conn.close()
+            return jsonify({"status": "error", "message": f"No attendance table for {student_id}"}), 404
+
+        now = datetime.now()
+        date_today = now.date().isoformat()
+        time_now = now.strftime("%H:%M:%S")
+
+        # Prevent duplicate within 5 minutes
+        c.execute(f"SELECT MAX(created_at) FROM {table_name}")
+        last_time = c.fetchone()[0]
+        if last_time:
+            last_dt = datetime.fromisoformat(last_time)
+            if (now - last_dt).seconds < 300:
+                conn.close()
+                return jsonify({"status": "ok", "message": "Duplicate entry ignored"})
+
+        # Insert attendance record
+        c.execute(f"""
+            INSERT INTO {table_name} (date, time_in, status, created_at)
+            VALUES (?, ?, ?, ?)
+        """, (date_today, time_now, 'present', now.isoformat()))
+
+        conn.commit()
+        conn.close()
+
+        return jsonify({"status": "ok", "message": "Attendance marked for " + name})
+
+    except Exception as e:
+        return jsonify({"status": "error", "message": str(e)})
 
 
 # ---------- ADMIN: Add initial admin user using shell ----------
