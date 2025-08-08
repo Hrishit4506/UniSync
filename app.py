@@ -31,6 +31,7 @@ DATASET_DIR = "dataset"
 FACE_SIZE = (100, 100)
 BUFFER_DURATION_SEC = 1.0
 CONFIDENCE_THRESHOLD = 120  # Lowered from 120 to make recognition more lenient
+current_stream_url = None
 
 SERIAL_PORT = 'COM4'  # Arduino port
 SERIAL_BAUD = 9600
@@ -922,8 +923,15 @@ def video_feed():
         flash('Access denied. Admin or Teacher privileges required.', 'error')
         return redirect(url_for('index'))
     
-    return Response(generate_frames(),
-                    mimetype='multipart/x-mixed-replace; boundary=frame')
+    global current_stream_url
+    if current_stream_url:
+        # ESP32-CAM via ngrok
+        return redirect(f"{current_stream_url}/stream")
+    else:
+        # Fallback to local camera
+        return Response(generate_frames(),
+                        mimetype='multipart/x-mixed-replace; boundary=frame')
+
 
 @app.route('/get_recognition_status')
 @login_required
@@ -1093,18 +1101,17 @@ def esp32_mark_attendance():
     except Exception as e:
         return jsonify({"status": "error", "message": str(e)})
 
-@app.route('/api/update_camera_stream', methods=['POST'])
+@app.route("/api/update_camera_stream", methods=["POST"])
 def update_camera_stream():
+    global current_stream_url
     data = request.get_json()
-    url = data.get("stream_url")
-    if not url:
-        return jsonify(status="error", message="Missing stream_url"), 400
+    if not data or "stream_url" not in data:
+        return {"status": "error", "message": "No stream_url provided"}, 400
     
-    # You can store it in a file
-    with open("camera_stream_url.txt", "w") as f:
-        f.write(url)
-    
-    return jsonify(status="ok", message="Stream URL updated")
+    current_stream_url = data["stream_url"]
+    print(f"[INFO] Updated stream URL: {current_stream_url}")
+    return {"status": "success", "public_url": current_stream_url}
+
 
 
 # ---------- ADMIN: Add initial admin user using shell ----------
