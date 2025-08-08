@@ -1100,17 +1100,16 @@ def esp32_mark_attendance():
 
     except Exception as e:
         return jsonify({"status": "error", "message": str(e)})
-
-@app.route("/api/update_camera_stream", methods=["POST"])
-def update_camera_stream():
-    global current_stream_url
-    data = request.get_json()
-    if not data or "stream_url" not in data:
-        return {"status": "error", "message": "No stream_url provided"}, 400
     
-    current_stream_url = data["stream_url"]
-    print(f"[INFO] Updated stream URL: {current_stream_url}")
-    return {"status": "success", "public_url": current_stream_url}
+@app.route('/api/update_camera_stream', methods=['POST'])
+def update_camera_stream():
+    data = request.get_json()
+    stream_url = data.get("stream_url")
+
+    # Store in DB or global variable
+    print("Received stream URL:", stream_url)
+    return {"status": "success"}, 200
+
 
 
 
