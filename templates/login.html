@@ -1,0 +1,59 @@
+{% extends 'base.html' %} 
+{% block body %}
+<section class="page-hero">
+  <div class="container">
+    <div class="row justify-content-center">
+      <div class="col-sm-10 col-md-8 col-lg-5">
+        <div class="card p-4 elev-2">
+          <div class="card-body">
+            <div class="text-center mb-3">
+              <div class="mb-2">
+                <span class="badge bg-primary">UniSync</span>
+              </div>
+              <h3 class="mb-1">Welcome back</h3>
+              <p class="text-muted mb-0">Sign in to your account</p>
+            </div>
+            <form method="POST" action="/login" novalidate>
+              <div class="mb-3">
+                <label for="username" class="form-label">Username</label>
+                <input type="text" class="form-control" id="username" name="username" required autocomplete="username" autofocus />
+              </div>
+              <div class="mb-3">
+                <label for="password" class="form-label">Password</label>
+                <input type="password" class="form-control" id="password" name="password" required autocomplete="current-password" />
+              </div>
+              <button type="submit" class="btn btn-primary w-100 mb-3">
+                <i class="fas fa-right-to-bracket me-2"></i>Login
+              </button>
+              <p class="text-center text-muted mb-0">
+                <i class="fas fa-circle-info me-1"></i>
+                Contact your administrator to create an account
+              </p>
+            </form>
+            <script>
+            document.addEventListener('DOMContentLoaded', function () {
+              const usernameInput = document.getElementById('username');
+              const passwordInput = document.getElementById('password');
+              const form = usernameInput ? usernameInput.form : null;
+              if (usernameInput && passwordInput) {
+                usernameInput.addEventListener('keydown', function (e) {
+                  if (e.key === 'Enter') {
+                    e.preventDefault();
+                    passwordInput.focus();
+                  }
+                });
+                passwordInput.addEventListener('keydown', function (e) {
+                  if (e.key === 'Enter' && form) {
+                    if (form.requestSubmit) { form.requestSubmit(); } else { form.submit(); }
+                  }
+                });
+              }
+            });
+            </script>
+          </div>
+        </div>
+      </div>
+    </div>
+  </div>
+</section>
+{% endblock body %}

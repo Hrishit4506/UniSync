@@ -1,0 +1,132 @@
+{% extends "base.html" %}
+
+{% block body %}
+<div class="container mt-4">
+    <div class="row">
+        <div class="col-12">
+            <h1 class="mb-4">
+                <i class="fas fa-cog me-2"></i>Streaming Settings Configuration
+            </h1>
+            
+            <div class="alert alert-info">
+                <i class="fas fa-info-circle me-2"></i>
+                <strong>Note:</strong> These settings control the video streaming performance and stability. 
+                Adjust carefully to balance between smooth streaming and reduced flickering.
+            </div>
+            
+            <div class="row">
+                <div class="col-md-8">
+                    <div class="card">
+                        <div class="card-header">
+                            <h5 class="mb-0">
+                                <i class="fas fa-sliders-h me-2"></i>Current Streaming Configuration
+                            </h5>
+                        </div>
+                        <div class="card-body">
+                            <form method="POST">
+                                <div class="row">
+                                    <div class="col-md-6">
+                                        <div class="mb-3">
+                                            <label for="stream_fps" class="form-label">Target FPS</label>
+                                            <input type="number" class="form-control" id="stream_fps" name="stream_fps" 
+                                                   value="{{ stream_fps }}" min="10" max="60" step="5">
+                                            <div class="form-text">
+                                                <strong>Current:</strong> {{ stream_fps }} FPS<br>
+                                                <strong>Range:</strong> 10-60 FPS<br>
+                                                <strong>Lower FPS = More stable, Higher FPS = More responsive</strong>
+                                            </div>
+                                        </div>
+                                    </div>
+                                    <div class="col-md-6">
+                                        <div class="mb-3">
+                                            <label for="frame_age_threshold" class="form-label">Frame Age Threshold (seconds)</label>
+                                            <input type="number" class="form-control" id="frame_age_threshold" name="frame_age_threshold" 
+                                                   value="{{ frame_age_threshold }}" min="0.05" max="0.5" step="0.05">
+                                            <div class="form-text">
+                                                <strong>Current:</strong> {{ frame_age_threshold }}s<br>
+                                                <strong>Range:</strong> 0.05-0.5 seconds<br>
+                                                <strong>Higher threshold = Less flickering, Lower threshold = More responsive</strong>
+                                            </div>
+                                        </div>
+                                    </div>
+                                </div>
+                                
+                                <div class="alert alert-warning">
+                                    <i class="fas fa-exclamation-triangle me-2"></i>
+                                    <strong>Performance Impact:</strong><br>
+                                    • <strong>FPS:</strong> Higher values increase CPU usage and may cause stuttering<br>
+                                    • <strong>Threshold:</strong> Higher values reduce flickering but may show slightly older frames
+                                </div>
+                                
+                                <div class="d-grid gap-2 d-md-flex justify-content-md-end">
+                                    <a href="{{ url_for('admin_dashboard') }}" class="btn btn-secondary me-md-2">
+                                        <i class="fas fa-arrow-left me-2"></i>Back to Dashboard
+                                    </a>
+                                    <button type="submit" class="btn btn-primary">
+                                        <i class="fas fa-save me-2"></i>Update Settings
+                                    </button>
+                                </div>
+                            </form>
+                        </div>
+                    </div>
+                </div>
+                
+                <div class="col-md-4">
+                    <div class="card">
+                        <div class="card-header">
+                            <h5 class="mb-0">
+                                <i class="fas fa-chart-line me-2"></i>Performance Metrics
+                            </h5>
+                        </div>
+                        <div class="card-body">
+                            <div class="mb-3">
+                                <h6>Current Configuration</h6>
+                                <ul class="list-unstyled">
+                                    <li><strong>Target FPS:</strong> {{ stream_fps }}</li>
+                                    <li><strong>Frame Delay:</strong> {{ "%.3f"|format(1.0 / stream_fps) }}s</li>
+                                    <li><strong>Age Threshold:</strong> {{ frame_age_threshold }}s</li>
+                                </ul>
+                            </div>
+                            
+                            <div class="mb-3">
+                                <h6>Recommended Settings</h6>
+                                <ul class="list-unstyled">
+                                    <li><strong>Stable:</strong> 20 FPS, 0.2s threshold</li>
+                                    <li><strong>Balanced:</strong> 30 FPS, 0.15s threshold</li>
+                                    <li><strong>Responsive:</strong> 40 FPS, 0.1s threshold</li>
+                                </ul>
+                            </div>
+                            
+                            <div class="alert alert-success">
+                                <i class="fas fa-lightbulb me-2"></i>
+                                <strong>Tip:</strong> Start with balanced settings and adjust based on your system performance and network conditions.
+                            </div>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+</div>
+
+<script>
+// Add some client-side validation
+document.getElementById('stream_fps').addEventListener('change', function() {
+    const fps = parseInt(this.value);
+    if (fps < 10 || fps > 60) {
+        this.setCustomValidity('FPS must be between 10 and 60');
+    } else {
+        this.setCustomValidity('');
+    }
+});
+
+document.getElementById('frame_age_threshold').addEventListener('change', function() {
+    const threshold = parseFloat(this.value);
+    if (threshold < 0.05 || threshold > 0.5) {
+        this.setCustomValidity('Threshold must be between 0.05 and 0.5 seconds');
+    } else {
+        this.setCustomValidity('');
+    }
+});
+</script>
+{% endblock body %}

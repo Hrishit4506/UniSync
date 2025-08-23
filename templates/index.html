@@ -1,0 +1,336 @@
+{% extends 'base.html' %} 
+{% block body %}
+<div class="container-fluid py-4">
+  <!-- Welcome Section -->
+  <div class="row mb-4">
+    <div class="col-12">
+      <div class="card bg-gradient-primary text-white">
+        <div class="card-body">
+          <div class="row align-items-center">
+            <div class="col-md-8">
+              <h2 class="card-title mb-2">
+                <i class="fas fa-user-circle me-2"></i>Welcome{% if current_user.is_authenticated %}, {{ current_user.username }}{% endif %}!
+              </h2>
+              <p class="card-text mb-0">{% if current_user.is_authenticated %}Track your attendance and view your statistics{% else %}Welcome to UniSync - Your Smart Campus Solution{% endif %}</p>
+            </div>
+            <div class="col-md-4 text-md-end">
+              {% if current_user.is_authenticated %}
+              <div class="d-flex justify-content-md-end">
+                <form method="POST" action="{{ url_for('mark_attendance') }}" class="d-inline me-2">
+                  <input type="hidden" name="action" value="check_in">
+                  <button type="submit" class="btn btn-light btn-sm">
+                    <i class="fas fa-sign-in-alt me-1"></i>Check In
+                  </button>
+                </form>
+                <form method="POST" action="{{ url_for('mark_attendance') }}" class="d-inline">
+                  <input type="hidden" name="action" value="check_out">
+                  <button type="submit" class="btn btn-outline-light btn-sm">
+                    <i class="fas fa-sign-out-alt me-1"></i>Check Out
+                  </button>
+                </form>
+              </div>
+              {% else %}
+              <div class="d-flex justify-content-md-end">
+                <a href="{{ url_for('login') }}" class="btn btn-light btn-sm">
+                  <i class="fas fa-sign-in-alt me-1"></i>Login
+                </a>
+              </div>
+              {% endif %}
+            </div>
+          </div>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <!-- Statistics Cards -->
+  <div class="row mb-4">
+    <div class="col-lg-4 col-md-6 mb-3">
+      <div class="card h-100 border-0 shadow-sm">
+        <div class="card-body text-center">
+          <div class="mb-3">
+            <i class="fas fa-calendar-week fa-3x text-primary"></i>
+          </div>
+          <h5 class="card-title">Weekly Attendance</h5>
+          <div class="progress mb-3" style="height: 10px;">
+            <div class="progress-bar bg-success" role="progressbar" 
+                 style="width: {{ week_percentage }}%" 
+                 aria-valuenow="{{ week_percentage }}" 
+                 aria-valuemin="0" aria-valuemax="100">
+            </div>
+          </div>
+          <h3 class="text-primary mb-0">{{ "%.1f"|format(week_percentage) }}%</h3>
+          <small class="text-muted">This week's attendance rate</small>
+        </div>
+      </div>
+    </div>
+
+    <div class="col-lg-4 col-md-6 mb-3">
+      <div class="card h-100 border-0 shadow-sm">
+        <div class="card-body text-center">
+          <div class="mb-3">
+            <i class="fas fa-calendar-alt fa-3x text-info"></i>
+          </div>
+          <h5 class="card-title">Monthly Attendance</h5>
+          <div class="progress mb-3" style="height: 10px;">
+            <div class="progress-bar bg-info" role="progressbar" 
+                 style="width: {{ month_percentage }}%" 
+                 aria-valuenow="{{ month_percentage }}" 
+                 aria-valuemin="0" aria-valuemax="100">
+            </div>
+          </div>
+          <h3 class="text-info mb-0">{{ "%.1f"|format(month_percentage) }}%</h3>
+          <small class="text-muted">This month's attendance rate</small>
+        </div>
+      </div>
+    </div>
+
+    <div class="col-lg-4 col-md-6 mb-3">
+      <div class="card h-100 border-0 shadow-sm">
+        <div class="card-body text-center">
+          <div class="mb-3">
+            <i class="fas fa-graduation-cap fa-3x text-warning"></i>
+          </div>
+          <h5 class="card-title">Semester Attendance</h5>
+          <div class="progress mb-3" style="height: 10px;">
+            <div class="progress-bar bg-warning" role="progressbar" 
+                 style="width: {{ semester_percentage }}%" 
+                 aria-valuenow="{{ semester_percentage }}" 
+                 aria-valuemin="0" aria-valuemax="100">
+            </div>
+          </div>
+          <h3 class="text-warning mb-0">{{ "%.1f"|format(semester_percentage) }}%</h3>
+          <small class="text-muted">Last 6 months attendance rate</small>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <!-- Attendance Records -->
+  {% if current_user.is_authenticated %}
+  <div class="row">
+    <!-- Manual Attendance Table -->
+    <div class="col-lg-6 mb-4">
+      <div class="card border-0 shadow-sm h-100">
+        <div class="card-header">
+          <h5 class="card-title mb-0">
+            <i class="fas fa-hand-paper me-2"></i>Manual Attendance Records
+          </h5>
+        </div>
+        <div class="card-body">
+          {% if recent_attendance %}
+          <div class="table-responsive">
+            <table class="table table-hover">
+              <thead class="table-light">
+                <tr>
+                  <th>Date</th>
+                  <th>Status</th>
+                  <th>Time In</th>
+                  <th>Time Out</th>
+                  <th>Duration</th>
+                </tr>
+              </thead>
+              <tbody>
+                {% for attendance in recent_attendance %}
+                <tr>
+                  <td>
+                    <strong>{{ attendance.date.strftime('%B %d, %Y') }}</strong>
+                    <br>
+                    <small class="text-muted">{{ attendance.date.strftime('%A') }}</small>
+                  </td>
+                  <td>
+                    {% if attendance.status == 'present' %}
+                      <span class="badge bg-success">
+                        <i class="fas fa-check me-1"></i>Present
+                      </span>
+                    {% elif attendance.status == 'late' %}
+                      <span class="badge bg-warning">
+                        <i class="fas fa-clock me-1"></i>Late
+                      </span>
+                    {% else %}
+                      <span class="badge bg-danger">
+                        <i class="fas fa-times me-1"></i>Absent
+                      </span>
+                    {% endif %}
+                  </td>
+                  <td>
+                    {% if attendance.time_in %}
+                      <i class="fas fa-sign-in-alt text-success me-1"></i>
+                      {{ attendance.time_in.strftime('%I:%M %p') }}
+                    {% else %}
+                      <span class="text-muted">-</span>
+                    {% endif %}
+                  </td>
+                  <td>
+                    {% if attendance.time_out %}
+                      <i class="fas fa-sign-out-alt text-danger me-1"></i>
+                      {{ attendance.time_out.strftime('%I:%M %p') }}
+                    {% else %}
+                      <span class="text-muted">-</span>
+                    {% endif %}
+                  </td>
+                  <td>
+                    {% if attendance.time_in and attendance.time_out %}
+                      {% set duration = attendance.time_out - attendance.time_in %}
+                      {% set hours = duration.total_seconds() // 3600 %}
+                      {% set minutes = (duration.total_seconds() % 3600) // 60 %}
+                      <span class="text-info">
+                        <i class="fas fa-clock me-1"></i>
+                        {{ hours|int }}h {{ minutes|int }}m
+                      </span>
+                    {% else %}
+                      <span class="text-muted">-</span>
+                    {% endif %}
+                  </td>
+                </tr>
+                {% endfor %}
+              </tbody>
+            </table>
+          </div>
+          {% else %}
+          <div class="text-center py-4">
+            <i class="fas fa-calendar-times fa-3x text-muted mb-3"></i>
+            <h5 class="text-muted">No manual attendance records found</h5>
+            <p class="text-muted">Start marking your attendance to see your records here.</p>
+          </div>
+          {% endif %}
+        </div>
+      </div>
+    </div>
+
+    <!-- Facial Recognition Attendance Table -->
+    <div class="col-lg-6 mb-4">
+      <div class="card border-0 shadow-sm h-100">
+        <div class="card-header">
+          <h5 class="card-title mb-0">
+            <i class="fas fa-camera me-2"></i>Facial Recognition Records
+          </h5>
+        </div>
+        <div class="card-body">
+          {% if facial_attendance %}
+          <div class="table-responsive">
+            <table class="table table-hover">
+              <thead class="table-light">
+                <tr>
+                  <th>Date</th>
+                  <th>Time</th>
+                  <th>Method</th>
+                </tr>
+              </thead>
+              <tbody>
+                {% for record in facial_attendance %}
+                <tr>
+                  <td>
+                    <strong>{{ record[0] }}</strong>
+                    <br>
+                    <small class="text-muted">{{ record[0] }}</small>
+                  </td>
+                  <td>
+                    <i class="fas fa-clock text-primary me-1"></i>
+                    {{ record[1][:16] if record[1] else '-' }}
+                  </td>
+                  <td>
+                    <span class="badge bg-primary">
+                      <i class="fas fa-camera me-1"></i>Face Recognition
+                    </span>
+                  </td>
+                </tr>
+                {% endfor %}
+              </tbody>
+            </table>
+          </div>
+          {% else %}
+          <div class="text-center py-4">
+            <i class="fas fa-camera fa-3x text-muted mb-3"></i>
+            <h5 class="text-muted">No facial recognition records found</h5>
+            <p class="text-muted">Face recognition attendance will appear here.</p>
+          </div>
+          {% endif %}
+        </div>
+      </div>
+    </div>
+  </div>
+  {% endif %}
+
+  <!-- Quick Actions -->
+  {% if current_user.is_authenticated %}
+  <div class="row mt-4">
+    <div class="col-12">
+      <div class="card border-0 shadow-sm">
+        <div class="card-header">
+          <h5 class="card-title mb-0">
+            <i class="fas fa-tasks me-2"></i>Quick Actions
+          </h5>
+        </div>
+        <div class="card-body">
+          <div class="row">
+            <div class="col-md-3 mb-3">
+              <div class="d-grid">
+                <button class="btn btn-outline-primary" onclick="location.reload()">
+                  <i class="fas fa-sync-alt me-2"></i>Refresh Stats
+                </button>
+              </div>
+            </div>
+            <div class="col-md-3 mb-3">
+              <div class="d-grid">
+                <button class="btn btn-outline-info" onclick="window.print()">
+                  <i class="fas fa-print me-2"></i>Print Report
+                </button>
+              </div>
+            </div>
+            <div class="col-md-3 mb-3">
+              <div class="d-grid">
+                <button class="btn btn-outline-success" onclick="exportData()">
+                  <i class="fas fa-download me-2"></i>Export Data
+                </button>
+              </div>
+            </div>
+            <div class="col-md-3 mb-3">
+              <div class="d-grid">
+                <a href="{{ url_for('logout') }}" class="btn btn-outline-danger">
+                  <i class="fas fa-sign-out-alt me-2"></i>Logout
+                </a>
+              </div>
+            </div>
+          </div>
+        </div>
+      </div>
+    </div>
+  </div>
+  {% endif %}
+</div>
+
+<script>
+function exportData() {
+  // Simple export functionality - can be enhanced later
+  alert('Export functionality will be implemented soon!');
+}
+</script>
+
+<style>
+.bg-gradient-primary {
+  background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+}
+
+.card {
+  transition: transform 0.2s ease-in-out;
+}
+
+.card:hover {
+  transform: translateY(-2px);
+}
+
+.progress {
+  border-radius: 10px;
+}
+
+.table th {
+  border-top: none;
+  font-weight: 600;
+}
+
+.badge {
+  font-size: 0.8em;
+}
+</style>
+{% endblock body %}
