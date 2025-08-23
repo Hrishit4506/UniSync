@@ -1,0 +1,369 @@
+{% extends "base.html" %}
+
+{% block title %}Mark Attendance{% endblock %}
+
+{% block body %}
+<div class="container mt-4">
+    <h2 class="mb-4">Manual Attendance Marking</h2>
+    
+    {% if students %}
+    <div class="row">
+        <div class="col-md-8">
+            <div class="card">
+                <div class="card-header d-flex justify-content-between align-items-center">
+                    <h5 class="mb-0">Mark Attendance for Today</h5>
+                    <div>
+                        <button type="button" class="btn btn-success btn-sm" onclick="markSelectedAsPresent()">
+                            <i class="fas fa-check"></i> Mark Selected as Present
+                        </button>
+                        <button type="button" class="btn btn-warning btn-sm" onclick="markSelectedAsAbsent()">
+                            <i class="fas fa-times"></i> Mark Selected as Absent
+                        </button>
+                    </div>
+                </div>
+                <div class="card-body">
+                    <form id="attendanceForm">
+                        <div class="table-responsive">
+                            <table class="table table-striped">
+                                <thead>
+                                    <tr>
+                                        <th width="50">
+                                            <input type="checkbox" id="selectAll" onchange="toggleSelectAll()">
+                                        </th>
+                                        <th>Student Name</th>
+                                        <th>Status</th>
+                                        <th>Action</th>
+                                    </tr>
+                                </thead>
+                                <tbody>
+                                    {% for student in students %}
+                                    <tr data-username="{{ student.username }}">
+                                        <td>
+                                            <input type="checkbox" class="student-checkbox" value="{{ student.username }}">
+                                        </td>
+                                        <td>{{ student.username }}</td>
+                                        <td>
+                                            <select class="form-select form-select-sm status-select" name="status_{{ student.username }}">
+                                                <option value="present">Present</option>
+                                                <option value="absent">Absent</option>
+                                                <option value="late">Late</option>
+                                                <option value="excused">Excused</option>
+                                            </select>
+                                        </td>
+                                        <td>
+                                            <button type="button" class="btn btn-primary btn-sm mark-btn" 
+                                                    onclick="markAttendance('{{ student.username }}')">
+                                                Mark
+                                            </button>
+                                        </td>
+                                    </tr>
+                                    {% endfor %}
+                                </tbody>
+                            </table>
+                        </div>
+                    </form>
+                </div>
+            </div>
+        </div>
+        
+        <div class="col-md-4">
+            <div class="card">
+                <div class="card-header">
+                    <h6 class="mb-0">Quick Actions</h6>
+                </div>
+                <div class="card-body">
+                    <button type="button" class="btn btn-success w-100 mb-2" onclick="markAllPresent()">
+                        <i class="fas fa-check-double"></i> Mark All Present
+                    </button>
+                    <button type="button" class="btn btn-warning w-100 mb-2" onclick="markAllAbsent()">
+                        <i class="fas fa-times"></i> Mark All Absent
+                    </button>
+                    <button type="button" class="btn btn-info w-100 mb-2" onclick="viewTodayAttendance()">
+                        <i class="fas fa-eye"></i> View Today's Attendance
+                    </button>
+                    <button type="button" class="btn btn-secondary w-100" onclick="clearAllSelections()">
+                        <i class="fas fa-eraser"></i> Clear All Selections
+                    </button>
+                </div>
+            </div>
+            
+            <div class="card mt-3">
+                <div class="card-header">
+                    <h6 class="mb-0">Status</h6>
+                </div>
+                <div class="card-body">
+                    <div id="statusMessages"></div>
+                </div>
+            </div>
+            
+            <div class="card mt-3">
+                <div class="card-header">
+                    <h6 class="mb-0">Summary</h6>
+                </div>
+                <div class="card-body">
+                    <p><strong>Total Students:</strong> <span id="totalStudents">{{ students|length }}</span></p>
+                    <p><strong>Selected:</strong> <span id="selectedCount">0</span></p>
+                    <p><strong>Marked Today:</strong> <span id="markedCount">0</span></p>
+                </div>
+            </div>
+        </div>
+    </div>
+    {% else %}
+    <div class="alert alert-warning">
+        No students found. Please add students first.
+    </div>
+    {% endif %}
+</div>
+
+<script>
+let markedStudents = new Set();
+
+function toggleSelectAll() {
+    const selectAllCheckbox = document.getElementById('selectAll');
+    const studentCheckboxes = document.querySelectorAll('.student-checkbox');
+    
+    studentCheckboxes.forEach(checkbox => {
+        checkbox.checked = selectAllCheckbox.checked;
+    });
+    
+    updateSelectedCount();
+}
+
+function updateSelectedCount() {
+    const selectedCheckboxes = document.querySelectorAll('.student-checkbox:checked');
+    document.getElementById('selectedCount').textContent = selectedCheckboxes.length;
+}
+
+function updateMarkedCount() {
+    document.getElementById('markedCount').textContent = markedStudents.size;
+}
+
+function markAttendance(username) {
+    const statusSelect = document.querySelector(`select[name="status_${username}"]`);
+    const status = statusSelect.value;
+    
+    fetch('/mark_attendance', {
+        method: 'POST',
+        headers: {
+            'Content-Type': 'application/json',
+        },
+        body: JSON.stringify({
+            username: username,
+            status: status
+        })
+    })
+    .then(response => response.json())
+    .then(data => {
+        if (data.success) {
+            showStatus(`✅ ${data.message}`, 'success');
+            markedStudents.add(username);
+            updateMarkedCount();
+            
+            // Disable the button after successful marking
+            const btn = document.querySelector(`button[onclick="markAttendance('${username}')"]`);
+            btn.disabled = true;
+            btn.textContent = 'Marked';
+            btn.classList.remove('btn-primary');
+            btn.classList.add('btn-success');
+            
+            // Uncheck the checkbox
+            const checkbox = document.querySelector(`input[value="${username}"]`);
+            if (checkbox) checkbox.checked = false;
+            updateSelectedCount();
+        } else {
+            showStatus(`❌ Error: ${data.error}`, 'error');
+        }
+    })
+    .catch(error => {
+        showStatus(`❌ Network error: ${error}`, 'error');
+    });
+}
+
+function markSelectedAsPresent() {
+    const selectedCheckboxes = document.querySelectorAll('.student-checkbox:checked');
+    if (selectedCheckboxes.length === 0) {
+        showStatus('⚠️ Please select students first', 'warning');
+        return;
+    }
+    
+    let markedCount = 0;
+    const totalSelected = selectedCheckboxes.length;
+    
+    showStatus(`🔄 Marking ${totalSelected} students as present...`, 'info');
+    
+    // Mark all selected students as present
+    selectedCheckboxes.forEach((checkbox, index) => {
+        const username = checkbox.value;
+        
+        fetch('/mark_attendance', {
+            method: 'POST',
+            headers: {
+                'Content-Type': 'application/json',
+            },
+            body: JSON.stringify({
+                username: username,
+                status: 'present'
+            })
+        })
+        .then(response => response.json())
+        .then(data => {
+            if (data.success) {
+                markedCount++;
+                markedStudents.add(username);
+                
+                // Update UI for this student
+                const btn = document.querySelector(`button[onclick="markAttendance('${username}')"]`);
+                if (btn) {
+                    btn.disabled = true;
+                    btn.textContent = 'Marked';
+                    btn.classList.remove('btn-primary');
+                    btn.classList.add('btn-success');
+                }
+                
+                // Uncheck the checkbox
+                checkbox.checked = false;
+                
+                if (markedCount === totalSelected) {
+                    showStatus(`✅ Successfully marked ${markedCount} student(s) as present!`, 'success');
+                    updateMarkedCount();
+                    updateSelectedCount();
+                    // Refresh the page after a short delay
+                    setTimeout(() => location.reload(), 2000);
+                }
+            } else {
+                showStatus(`❌ Error marking ${username}: ${data.error}`, 'error');
+            }
+        })
+        .catch(error => {
+            showStatus(`❌ Network error marking ${username}: ${error}`, 'error');
+        });
+    });
+}
+
+function markSelectedAsAbsent() {
+    const selectedCheckboxes = document.querySelectorAll('.student-checkbox:checked');
+    if (selectedCheckboxes.length === 0) {
+        showStatus('⚠️ Please select students first', 'warning');
+        return;
+    }
+    
+    let markedCount = 0;
+    const totalSelected = selectedCheckboxes.length;
+    
+    showStatus(`🔄 Marking ${totalSelected} students as absent...`, 'info');
+    
+    // Mark all selected students as absent
+    selectedCheckboxes.forEach((checkbox, index) => {
+        const username = checkbox.value;
+        
+        fetch('/mark_attendance', {
+            method: 'POST',
+            headers: {
+                'Content-Type': 'application/json',
+            },
+            body: JSON.stringify({
+                username: username,
+                status: 'absent'
+            })
+        })
+        .then(response => response.json())
+        .then(data => {
+            if (data.success) {
+                markedCount++;
+                markedStudents.add(username);
+                
+                // Update UI for this student
+                const btn = document.querySelector(`button[onclick="markAttendance('${username}')"]`);
+                if (btn) {
+                    btn.disabled = true;
+                    btn.textContent = 'Marked';
+                    btn.classList.remove('btn-primary');
+                    btn.classList.add('btn-success');
+                }
+                
+                // Uncheck the checkbox
+                checkbox.checked = false;
+                
+                if (markedCount === totalSelected) {
+                    showStatus(`✅ Successfully marked ${markedCount} student(s) as absent!`, 'success');
+                    updateMarkedCount();
+                    updateSelectedCount();
+                    // Refresh the page after a short delay
+                    setTimeout(() => location.reload(), 2000);
+                }
+            } else {
+                showStatus(`❌ Error marking ${username}: ${data.error}`, 'error');
+            }
+        })
+        .catch(error => {
+            showStatus(`❌ Network error marking ${username}: ${error}`, 'error');
+        });
+    });
+}
+
+function markAllPresent() {
+    const statusSelects = document.querySelectorAll('.status-select');
+    statusSelects.forEach(select => {
+        select.value = 'present';
+    });
+    showStatus('📝 All students marked as present (click individual Mark buttons to save)', 'info');
+}
+
+function markAllAbsent() {
+    const statusSelects = document.querySelectorAll('.status-select');
+    statusSelects.forEach(select => {
+        select.value = 'absent';
+    });
+    showStatus('📝 All students marked as absent (click individual Mark buttons to save)', 'info');
+}
+
+function clearAllSelections() {
+    const studentCheckboxes = document.querySelectorAll('.student-checkbox');
+    studentCheckboxes.forEach(checkbox => {
+        checkbox.checked = false;
+    });
+    document.getElementById('selectAll').checked = false;
+    updateSelectedCount();
+    showStatus('🧹 All selections cleared', 'info');
+}
+
+function viewTodayAttendance() {
+    window.location.href = '/get_today_attendance';
+}
+
+function showStatus(message, type) {
+    const statusDiv = document.getElementById('statusMessages');
+    const alertClass = type === 'success' ? 'alert-success' : 
+                      type === 'error' ? 'alert-danger' : 
+                      type === 'warning' ? 'alert-warning' : 'alert-info';
+    
+    const alertDiv = document.createElement('div');
+    alertDiv.className = `alert ${alertClass} alert-dismissible fade show`;
+    alertDiv.innerHTML = `
+        ${message}
+        <button type="button" class="btn-close" data-bs-dismiss="alert"></button>
+    `;
+    
+    statusDiv.appendChild(alertDiv);
+    
+    // Auto-remove after 5 seconds
+    setTimeout(() => {
+        if (alertDiv.parentNode) {
+            alertDiv.remove();
+        }
+    }, 5000);
+}
+
+// Event listeners
+document.addEventListener('DOMContentLoaded', function() {
+    // Update counts when checkboxes change
+    document.querySelectorAll('.student-checkbox').forEach(checkbox => {
+        checkbox.addEventListener('change', updateSelectedCount);
+    });
+    
+    // Initialize counts
+    updateSelectedCount();
+    updateMarkedCount();
+});
+</script>
+{% endblock %} 
