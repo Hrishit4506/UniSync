@@ -1,7 +1,7 @@
 @echo off
-title UniSync Smart Campus System
+title UniSync with Tunnel Notifier
 echo ========================================
-echo    UniSync Smart Campus System
+echo    UniSync with Tunnel Notifier
 echo ========================================
 echo.
 
@@ -15,11 +15,21 @@ echo Waiting for Flask app to start...
 timeout /t 5 /nobreak >nul
 
 echo.
-echo Starting ngrok tunnel...
+echo Starting cloudflared tunnel...
 echo.
 
-REM Start ngrok tunnel
-start "Ngrok Tunnel" python ngrok_config.py start 5000
+REM Start cloudflared tunnel
+start "Cloudflared Tunnel" python cloudflared_config.py start 5000
+
+echo Waiting for cloudflared tunnel to start...
+timeout /t 10 /nobreak >nul
+
+echo.
+echo Starting tunnel notifier for Render services...
+echo.
+
+REM Start tunnel notifier
+start "Tunnel Notifier" python tunnel_notifier.py
 
 echo.
 echo ========================================
@@ -27,7 +37,8 @@ echo    System is starting up...
 echo ========================================
 echo.
 echo Flask App: http://localhost:5000
-echo Ngrok Status: http://localhost:4040
+echo Cloudflared: Check the tunnel console window for public URL
+echo Tunnel Notifier: Will automatically notify Render services
 echo.
 echo Press any key to open the web interface...
 pause >nul
@@ -38,5 +49,7 @@ start http://localhost:5000
 echo.
 echo System is running! 
 echo Close this window to keep the system running in background.
+echo.
+echo IMPORTANT: Keep all console windows open for the system to work properly.
 echo.
 pause

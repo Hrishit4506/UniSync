@@ -10,7 +10,7 @@ import sqlite3
 from datetime import datetime, date
 
 # --- CONFIGURATION ---
-ESP32_IP = "192.168.29.115"
+ESP32_IP = os.environ.get('ESP32_IP', '192.168.1.100')
 STREAM_URL = f"http://{ESP32_IP}:81/stream"
 DATASET_DIR = "dataset"
 FACE_SIZE = (100, 100)

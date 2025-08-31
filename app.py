@@ -19,26 +19,27 @@ import calendar
 import serial
 import json
 import itertools
+from config import config
 
+# Get configuration based on environment
+config_name = os.environ.get('FLASK_ENV', 'development')
 app = Flask(__name__)
-app.config['SECRET_KEY'] = 'your-secret-key-here'
-app.config['SQLALCHEMY_DATABASE_URI'] = 'sqlite:///C:/Users/HRISHIT/Downloads/UniSync/UniSync-4d77a5dcdfb6b4ace70b88fe5a2f98dbdae2c6dc/instance/User.db'
-app.config['SQLALCHEMY_TRACK_MODIFICATIONS'] = False
-app.config['UPLOAD_FOLDER'] = 'dataset'
-app.config['MAX_CONTENT_LENGTH'] = 16 * 1024 * 1024  # 16MB max file size
+app.config.from_object(config[config_name])
+
 ALLOWED_EXTENSIONS = {'png', 'jpg', 'jpeg', 'gif', 'bmp'}
 
-# ESP32-CAM Configuration (from run.py)
-ESP32_IP = "192.168.29.115"
-STREAM_URL = f"http://{ESP32_IP}/stream"  # ESP32-CAM uses port 80 by default
-ESP32_STREAM_URL = f"http://{ESP32_IP}:81/stream"  # Preferred smooth stream
-DATASET_DIR = "dataset"
-FACE_SIZE = (160, 160)  # Increased face size for better recognition
-BUFFER_DURATION_SEC = 1.0
-CONFIDENCE_THRESHOLD = 150  # Increased threshold for better accuracy
+# ESP32-CAM Configuration
+ESP32_IP = app.config['ESP32_IP']
+STREAM_URL = app.config['STREAM_URL']
+ESP32_STREAM_URL = app.config['ESP32_STREAM_URL']
+DATASET_DIR = app.config['DATASET_DIR']
+FACE_SIZE = app.config['FACE_SIZE']
+BUFFER_DURATION_SEC = app.config['BUFFER_DURATION_SEC']
+CONFIDENCE_THRESHOLD = app.config['CONFIDENCE_THRESHOLD']
 
-SERIAL_PORT = 'COM4'  # Arduino port
-SERIAL_BAUD = 9600
+# Arduino Configuration
+SERIAL_PORT = app.config['SERIAL_PORT']
+SERIAL_BAUD = app.config['SERIAL_BAUD']
 
 # Global variables for face recognition (from run.py)
 face_recognizer = None
@@ -78,6 +79,59 @@ recognition_last_seen_time = 0.0
 NAME_WINDOW_MIN_COUNT = 3
 NAME_UPDATE_COOLDOWN_SEC = 0.2
 UNKNOWN_RESET_TIMEOUT_SEC = 1.0
+
+# ---------- LAB MANAGEMENT: RFID → Student, Computers, Sessions ----------
+class RFIDCard(db.Model):
+    id = db.Column(db.Integer, primary_key=True)
+    uid = db.Column(db.String(64), unique=True, nullable=False)  # hex string from UNO
+    user_id = db.Column(db.Integer, db.ForeignKey('user.id'), nullable=False)
+
+class Computer(db.Model):
+    id = db.Column(db.Integer, primary_key=True)
+    name = db.Column(db.String(50), unique=True, nullable=False)
+    is_in_use = db.Column(db.Boolean, default=False)
+    current_session_id = db.Column(db.Integer, nullable=True)
+
+class LabSession(db.Model):
+    id = db.Column(db.Integer, primary_key=True)
+    user_id = db.Column(db.Integer, db.ForeignKey('user.id'), nullable=False)
+    computer_id = db.Column(db.Integer, db.ForeignKey('computer.id'), nullable=False)
+    start_time = db.Column(db.DateTime, default=datetime.utcnow, nullable=False)
+    end_time = db.Column(db.DateTime, nullable=True)
+    password = db.Column(db.String(32), nullable=False)
+
+def _generate_session_password(length: int = 8) -> str:
+    import secrets
+    alphabet = 'ABCDEFGHJKLMNPQRSTUVWXYZ23456789'
+    return ''.join(secrets.choice(alphabet) for _ in range(length))
+
+def _find_available_computer() -> Optional[Computer]:
+    return Computer.query.filter_by(is_in_use=False).order_by(Computer.id.asc()).first()
+
+def _assign_computer_to_user(user_id: int) -> Optional[LabSession]:
+    free_pc = _find_available_computer()
+    if not free_pc:
+        return None
+    pwd = _generate_session_password()
+    session_row = LabSession(user_id=user_id, computer_id=free_pc.id, password=pwd)
+    db.session.add(session_row)
+    db.session.flush()
+    free_pc.is_in_use = True
+    free_pc.current_session_id = session_row.id
+    db.session.commit()
+    return session_row
+
+def _end_active_session_for_user(user_id: int) -> Optional[LabSession]:
+    active = LabSession.query.filter_by(user_id=user_id, end_time=None).order_by(LabSession.start_time.desc()).first()
+    if not active:
+        return None
+    active.end_time = datetime.utcnow()
+    pc = Computer.query.get(active.computer_id)
+    if pc:
+        pc.is_in_use = False
+        pc.current_session_id = None
+    db.session.commit()
+    return active
 
 def _capture_basic_frames():
     global basic_frame
@@ -247,7 +301,10 @@ login_manager.login_view = 'login'
 
 @login_manager.user_loader
 def load_user(user_id):
-    return User.query.get(int(user_id))
+    try:
+        return db.session.get(User, int(user_id))
+    except Exception:
+        return None
 
 # ---------- MODELS ----------
 class User(db.Model, UserMixin):
@@ -356,7 +413,7 @@ def prepare_training_data(dataset_path):
 def get_facial_recognition_attendance(username):
     """Get attendance data for a user from facial recognition system"""
     try:
-        conn = sqlite3.connect('./instance/User.db')
+        conn = sqlite3.connect(app.config['SQLALCHEMY_DATABASE_URI'].replace('sqlite:///', ''))
         cursor = conn.cursor()
         
         # Get attendance records for the user
@@ -393,7 +450,7 @@ def start_streaming_thread():
     # Ensure required variables are defined
     if 'STREAM_URL' not in globals() or 'ESP32_IP' not in globals():
         print("[Streaming Error] Required variables not defined, initializing...")
-        ESP32_IP = "192.168.29.115"
+        ESP32_IP = app.config.get('ESP32_IP', '192.168.1.100')
         STREAM_URL = f"http://{ESP32_IP}/stream"
     
     if not streaming_active:
@@ -730,6 +787,86 @@ def send_serial_command(command):
             print(f"[Serial] Sent command: {command}")
         except Exception as e:
             print(f"[Serial Error] Failed to send command: {e}")
+    else:
+        print(f"[Serial] (not connected) Would send: {command}")
+
+def _readline_nonblocking(port: serial.Serial) -> Optional[str]:
+    try:
+        if port.in_waiting > 0:
+            line = port.readline().decode(errors='ignore').strip()
+            return line if line else None
+    except Exception:
+        return None
+    return None
+
+def _handle_rfid_uid(uid_hex: str):
+    try:
+        card = RFIDCard.query.filter_by(uid=uid_hex).first()
+        if not card:
+            print(f"[RFID] Unknown card {uid_hex}. Awaiting binding.")
+            return
+        user = User.query.get(card.user_id)
+        if not user:
+            print(f"[RFID] Card mapped to missing user_id={card.user_id}")
+            return
+        # Toggle logic: if user has an active session, end it; else assign one
+        active = LabSession.query.filter_by(user_id=user.id, end_time=None).first()
+        if active:
+            ended = _end_active_session_for_user(user.id)
+            if ended:
+                uptime = (ended.end_time - ended.start_time).total_seconds()
+                print(f"[Lab] Ended session for {user.username} on PC{ended.computer_id} after {uptime:.0f}s")
+                # Do not send passwords over serial; optional minimal logout notice
+                send_serial_command(f"LOGOUT:{user.username}:PC{ended.computer_id}")
+        else:
+            session_row = _assign_computer_to_user(user.id)
+            if not session_row:
+                print("[Lab] No free computers available")
+                send_serial_command("NO_FREE_PC")
+                return
+            pc = Computer.query.get(session_row.computer_id)
+            print(f"[Lab] Assigned {user.username} to {pc.name} (password hidden)")
+            # Do not send the password over serial; optional minimal login notice without password
+            send_serial_command(f"LOGIN:{user.username}:{pc.name}")
+    except Exception as e:
+        print(f"[RFID Handler Error] {e}")
+
+def start_serial_listener():
+    """Background thread: listen for RFID scans over serial.
+    Expected UNO messages (one per line): UID:<hex> e.g., UID:DE AD BE EF
+    """
+    def loop():
+        global ser
+        print("[SerialListener] Starting...")
+        # Ensure application context for DB work inside thread
+        with app.app_context():
+            while True:
+                try:
+                    if ser is None or not ser.is_open:
+                        try:
+                            ser = serial.Serial(SERIAL_PORT, SERIAL_BAUD, timeout=1)
+                            time.sleep(2)
+                            print(f"[SerialListener] Reconnected {SERIAL_PORT}")
+                        except Exception as e:
+                            time.sleep(1)
+                            continue
+                    line = _readline_nonblocking(ser)
+                    if not line:
+                        time.sleep(0.05)
+                        continue
+                    if line.startswith('UID:'):
+                        uid_raw = line.split(':', 1)[1].strip()
+                        uid_hex = uid_raw.replace(' ', '').upper()
+                        print(f"[RFID] UID scanned: {uid_hex}")
+                        _handle_rfid_uid(uid_hex)
+                    else:
+                        # other messages can be logged
+                        pass
+                except Exception:
+                    time.sleep(0.2)
+                    continue
+    t = threading.Thread(target=loop, daemon=True)
+    t.start()
 
 # ---------- SERIAL COMMUNICATION ----------
 def init_serial():
@@ -797,6 +934,126 @@ def admin_dashboard():
     
     users = User.query.all()
     return render_template('admin_dashboard.html', users=users)
+
+@app.route('/admin/user_management')
+@login_required
+def admin_user_management():
+    if not current_user.is_admin():
+        flash('Access denied', 'error')
+        return redirect(url_for('index'))
+    
+    try:
+        users = User.query.all()
+        print(f"DEBUG: Found {len(users)} users in database")
+        for user in users:
+            print(f"DEBUG: User - ID: {user.id}, Username: {user.username}, Role: {user.role}")
+        
+        return render_template('admin_user_management.html', users=users)
+    except Exception as e:
+        print(f"DEBUG: Error in admin_user_management: {e}")
+        flash(f'Error loading users: {str(e)}', 'error')
+        return render_template('admin_user_management.html', users=[])
+
+@app.route('/admin/bind_card', methods=['POST'])
+@login_required
+def bind_card():
+    if not current_user.is_admin():
+        return jsonify({'error': 'Access denied'}), 403
+    try:
+        data = request.get_json(silent=True) or {}
+        uid = (data.get('uid') or request.form.get('uid') or '').replace(' ', '').upper()
+        username = (data.get('username') or request.form.get('username') or '').strip()
+        if not uid or not username:
+            return jsonify({'error': 'uid and username are required'}), 400
+        user = User.query.filter_by(username=username).first()
+        if not user:
+            return jsonify({'error': 'User not found'}), 404
+        existing = RFIDCard.query.filter_by(uid=uid).first()
+        if existing and existing.user_id != user.id:
+            return jsonify({'error': 'Card already bound to another user'}), 409
+        if not existing:
+            existing = RFIDCard(uid=uid, user_id=user.id)
+            db.session.add(existing)
+        else:
+            existing.user_id = user.id
+        db.session.commit()
+        # Support form submissions by redirecting back to GUI
+        if request.is_json:
+            return jsonify({'success': True, 'uid': uid, 'username': username})
+        flash('RFID card bound successfully', 'success')
+        return redirect(url_for('admin_rfid'))
+    except Exception as e:
+        db.session.rollback()
+        return jsonify({'error': str(e)}), 500
+
+@app.route('/admin/lab_status')
+@login_required
+def lab_status():
+    if not current_user.is_admin() and not current_user.is_teacher():
+        return jsonify({'error': 'Access denied'}), 403
+    try:
+        pcs = Computer.query.order_by(Computer.id.asc()).all()
+        response = []
+        now = datetime.utcnow()
+        for pc in pcs:
+            session_id = pc.current_session_id
+            session_data = None
+            uptime_seconds = 0
+            if session_id:
+                s = LabSession.query.get(session_id)
+                if s:
+                    uptime_seconds = int((now - s.start_time).total_seconds())
+                    user = User.query.get(s.user_id)
+                    session_data = {
+                        'session_id': s.id,
+                        'user': user.username if user else None,
+                        'start_time': s.start_time.isoformat(),
+                        'password': s.password
+                    }
+            response.append({
+                'id': pc.id,
+                'name': pc.name,
+                'is_in_use': pc.is_in_use,
+                'uptime_seconds': uptime_seconds,
+                'session': session_data
+            })
+        return jsonify({'computers': response})
+    except Exception as e:
+        return jsonify({'error': str(e)}), 500
+
+@app.route('/admin/rfid')
+@login_required
+def admin_rfid():
+    if not current_user.is_admin():
+        flash('Access denied', 'error')
+        return redirect(url_for('index'))
+    # List users and existing mappings
+    users = User.query.order_by(User.username.asc()).all()
+    mappings = db.session.query(RFIDCard, User).join(User, RFIDCard.user_id == User.id).order_by(RFIDCard.uid.asc()).all()
+    return render_template('admin_rfid.html', users=users, mappings=mappings)
+
+@app.route('/admin/unbind_card', methods=['POST'])
+@login_required
+def unbind_card():
+    if not current_user.is_admin():
+        return jsonify({'error': 'Access denied'}), 403
+    try:
+        data = request.get_json(silent=True) or {}
+        uid = (data.get('uid') or request.form.get('uid') or '').replace(' ', '').upper()
+        if not uid:
+            return jsonify({'error': 'uid is required'}), 400
+        card = RFIDCard.query.filter_by(uid=uid).first()
+        if not card:
+            return jsonify({'error': 'Card not found'}), 404
+        db.session.delete(card)
+        db.session.commit()
+        if request.is_json:
+            return jsonify({'success': True, 'uid': uid})
+        flash('RFID card unbound', 'success')
+        return redirect(url_for('admin_rfid'))
+    except Exception as e:
+        db.session.rollback()
+        return jsonify({'error': str(e)}), 500
 
 @app.route('/admin/create_user', methods=['GET', 'POST'])
 @login_required
@@ -1144,6 +1401,248 @@ def delete_holiday(holiday_id: int):
         flash(f'Failed to delete holiday: {e}', 'error')
     return redirect(url_for('admin_holidays'))
 
+# New Admin Routes for User Records Management
+@app.route('/admin/get_user_records/<int:user_id>')
+@login_required
+def get_user_records(user_id: int):
+    if not current_user.is_admin():
+        return jsonify({'success': False, 'message': 'Access denied'})
+    
+    try:
+        # Get user information
+        user = User.query.get(user_id)
+        if not user:
+            return jsonify({'success': False, 'message': 'User not found'})
+        
+        # Get user's attendance records
+        conn = sqlite3.connect('./instance/User.db')
+        cursor = conn.cursor()
+        
+        # Get all attendance records from the attendance table
+        cursor.execute('''
+            SELECT id, date, time_in, time_out, status 
+            FROM attendance 
+            WHERE user_name = ? 
+            ORDER BY date DESC
+        ''', (user.username,))
+        
+        all_records = []
+        for row in cursor.fetchall():
+            # Determine if this was likely a facial recognition entry or manual entry
+            # Facial recognition entries typically have time_in but no time_out
+            method = 'Facial Recognition' if row[2] and not row[3] else 'Manual Entry'
+            timestamp = row[1] + ' ' + (row[2] or '00:00:00')
+            
+            all_records.append({
+                'id': row[0],
+                'timestamp': timestamp,
+                'method': method,
+                'status': row[4] or 'Present'
+            })
+        
+        conn.close()
+        
+        return jsonify({
+            'success': True,
+            'user_info': {
+                'id': user.id,
+                'username': user.username,
+                'role': user.role
+            },
+            'records': all_records
+        })
+        
+    except Exception as e:
+        return jsonify({'success': False, 'message': str(e)})
+
+@app.route('/admin/export_user_records/<int:user_id>')
+@login_required
+def export_user_records(user_id: int):
+    if not current_user.is_admin():
+        return jsonify({'success': False, 'message': 'Access denied'})
+    
+    try:
+        # Get user information
+        user = User.query.get(user_id)
+        if not user:
+            return jsonify({'success': False, 'message': 'User not found'})
+        
+        # Get user's attendance records
+        conn = sqlite3.connect('./instance/User.db')
+        cursor = conn.cursor()
+        
+        # Get all attendance records from the attendance table
+        cursor.execute('''
+            SELECT date, time_in, time_out, status
+            FROM attendance 
+            WHERE user_name = ?
+            ORDER BY date DESC
+        ''', (user.username,))
+        
+        records = cursor.fetchall()
+        conn.close()
+        
+        # Create CSV content
+        csv_content = "Date,Time In,Time Out,Status,Method\n"
+        for record in records:
+            csv_content += f"{record[0]},{record[1] or ''},{record[2] or ''},{record[3]},{record[4]}\n"
+        
+        # Create response with CSV headers
+        response = Response(csv_content, mimetype='text/csv')
+        response.headers['Content-Disposition'] = f'attachment; filename=user_records_{user.username}.csv'
+        return response
+        
+    except Exception as e:
+        return jsonify({'success': False, 'message': str(e)})
+
+@app.route('/admin/delete_record/<int:record_id>', methods=['DELETE'])
+@login_required
+def delete_record(record_id: int):
+    if not current_user.is_admin():
+        return jsonify({'success': False, 'message': 'Access denied'})
+    
+    try:
+        conn = sqlite3.connect('./instance/User.db')
+        cursor = conn.cursor()
+        
+        # Delete from attendance table
+        cursor.execute('DELETE FROM attendance WHERE id = ?', (record_id,))
+        
+        conn.commit()
+        conn.close()
+        
+        return jsonify({'success': True, 'message': 'Record deleted successfully'})
+        
+    except Exception as e:
+        return jsonify({'success': False, 'message': str(e)})
+
+@app.route('/admin/modify_record/<int:record_id>', methods=['POST'])
+@login_required
+def modify_record(record_id: int):
+    if not current_user.is_admin():
+        return jsonify({'success': False, 'message': 'Access denied'})
+    
+    try:
+        data = request.get_json()
+        new_date = data.get('date')
+        new_time_in = data.get('time_in')
+        new_time_out = data.get('time_out')
+        new_status = data.get('status')
+        
+        conn = sqlite3.connect('./instance/User.db')
+        cursor = conn.cursor()
+        
+        # Update attendance record
+        cursor.execute('''
+            UPDATE attendance 
+            SET date = ?, time_in = ?, time_out = ?, status = ?
+            WHERE id = ?
+        ''', (new_date, new_time_in, new_time_out, new_status, record_id))
+        
+        conn.commit()
+        conn.close()
+        
+        return jsonify({'success': True, 'message': 'Record modified successfully'})
+        
+    except Exception as e:
+        return jsonify({'success': False, 'message': str(e)})
+
+@app.route('/admin/add_manual_record', methods=['POST'])
+@login_required
+def add_manual_record():
+    if not current_user.is_admin():
+        return jsonify({'success': False, 'message': 'Access denied'})
+    
+    try:
+        data = request.get_json()
+        user_id = data.get('user_id')
+        date = data.get('date')
+        time_in = data.get('time_in')
+        time_out = data.get('time_out')
+        status = data.get('status', 'present')
+        
+        # Get user information
+        user = User.query.get(user_id)
+        if not user:
+            return jsonify({'success': False, 'message': 'User not found'})
+        
+        conn = sqlite3.connect('./instance/User.db')
+        cursor = conn.cursor()
+        
+        # Insert new manual attendance record
+        cursor.execute('''
+            INSERT INTO attendance (user_name, date, time_in, time_out, status)
+            VALUES (?, ?, ?, ?, ?)
+        ''', (user.username, date, time_in, time_out, status))
+        
+        conn.commit()
+        conn.close()
+        
+        return jsonify({'success': True, 'message': 'Manual record added successfully'})
+        
+    except Exception as e:
+        return jsonify({'success': False, 'message': str(e)})
+
+@app.route('/admin/bulk_edit_records', methods=['POST'])
+@login_required
+def bulk_edit_records():
+    if not current_user.is_admin():
+        return jsonify({'success': False, 'message': 'Access denied'})
+    
+    try:
+        data = request.get_json()
+        record_ids = data.get('record_ids', [])
+        updates = data.get('updates', {})
+        
+        if not record_ids:
+            return jsonify({'success': False, 'message': 'No records selected'})
+        
+        conn = sqlite3.connect('./instance/User.db')
+        cursor = conn.cursor()
+        
+        # Update multiple records
+        for record_id in record_ids:
+            cursor.execute('''
+                UPDATE attendance 
+                SET date = ?, time_in = ?, time_out = ?, status = ?
+                WHERE id = ?
+            ''', (updates.get('date'), updates.get('time_in'), 
+                  updates.get('time_out'), updates.get('status'), record_id))
+        
+        conn.commit()
+        conn.close()
+        
+        return jsonify({'success': True, 'message': f'{len(record_ids)} records updated successfully'})
+        
+    except Exception as e:
+        return jsonify({'success': False, 'message': str(e)})
+
+@app.route('/admin/reset_user_password/<int:user_id>', methods=['POST'])
+@login_required
+def reset_user_password(user_id: int):
+    if not current_user.is_admin():
+        return jsonify({'success': False, 'message': 'Access denied'})
+    
+    try:
+        user = User.query.get(user_id)
+        if not user:
+            return jsonify({'success': False, 'message': 'User not found'})
+        
+        # Reset password to default
+        default_password = os.environ.get('DEFAULT_RESET_PASSWORD', 'password123')
+        user.password = generate_password_hash(default_password)
+        
+        db.session.commit()
+        
+        return jsonify({
+            'success': True, 
+            'message': f'Password reset successfully for {user.username}',
+            'new_password': default_password
+        })
+        
+    except Exception as e:
+        return jsonify({'success': False, 'message': str(e)})
+
 @app.route('/teacher/dashboard')
 @login_required
 def teacher_dashboard():
@@ -1197,10 +1696,25 @@ def student_dashboard():
         week_percentage = 0.0
         month_percentage = 0.0
     
+    # Include active lab session info (if any)
+    try:
+        active_session = LabSession.query.filter_by(user_id=current_user.id, end_time=None).order_by(LabSession.start_time.desc()).first()
+        active_info = None
+        if active_session:
+            pc = Computer.query.get(active_session.computer_id)
+            active_info = {
+                'pc_name': pc.name if pc else f"PC{active_session.computer_id}",
+                'password': active_session.password,
+                'start_time': active_session.start_time
+            }
+    except Exception:
+        active_info = None
+
     return render_template('student_dashboard.html', 
                          recent_attendance=recent_attendance,
                          week_percentage=week_percentage,
-                         month_percentage=month_percentage)
+                         month_percentage=month_percentage,
+                         active_session=active_info)
 
 @app.route('/student/change_password', methods=['GET', 'POST'])
 @login_required
@@ -1922,7 +2436,7 @@ if __name__ == '__main__':
                 
                 # Create attendance table if it doesn't exist
                 try:
-                    conn = sqlite3.connect('./instance/User.db')
+                    conn = sqlite3.connect(app.config['SQLALCHEMY_DATABASE_URI'].replace('sqlite:///', ''))
                     cursor = conn.cursor()
                     
                     # Check if table exists and has correct schema
@@ -1992,7 +2506,25 @@ if __name__ == '__main__':
                 print(f"[System] Facial recognition initialization failed: {e}")
             
             # Do not start legacy background streaming; minimal capture will start on-demand
-        
+            try:
+                # Initialize lab computers if missing
+                existing = Computer.query.count()
+                if existing == 0:
+                    for i in range(1, 11):
+                        db.session.add(Computer(name=f"PC{i}"))
+                    db.session.commit()
+                    print("[System] Initialized 10 lab computers (PC1..PC10)")
+                else:
+                    print(f"[System] Lab computers present: {existing}")
+            except Exception as e:
+                print(f"[System] Failed to init lab computers: {e}")
+
+            try:
+                start_serial_listener()
+                print("[System] Serial listener started")
+            except Exception as e:
+                print(f"[System] Serial listener failed to start: {e}")
+
         # Run Flask app with host='0.0.0.0' to allow external connections
         app.run(debug=True, host='0.0.0.0', port=5000, threaded=True)
     except KeyboardInterrupt:

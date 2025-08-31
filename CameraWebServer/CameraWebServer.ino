@@ -9,7 +9,7 @@
 // ===========================
 // Enter your WiFi credentials
 // ===========================
-const char *ssid = "Nathdwar_4G";
+const char *ssid = "ESP32";
 const char *password = "04052006";
 
 void startCameraServer();

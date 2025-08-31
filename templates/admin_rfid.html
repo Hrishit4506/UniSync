@@ -1,0 +1,97 @@
+{% extends "base.html" %}
+{% block body %}
+<div class="container mt-4">
+  <div class="row">
+    <div class="col-lg-7 mb-3">
+      <div class="card">
+        <div class="card-header">
+          <h5 class="mb-0"><i class="fas fa-id-card me-2"></i>Bind RFID Card to Student</h5>
+        </div>
+        <div class="card-body">
+          <form method="POST" action="{{ url_for('bind_card') }}" class="row g-3">
+            <div class="col-md-6">
+              <label for="uid" class="form-label">Card UID</label>
+              <input type="text" class="form-control" id="uid" name="uid" placeholder="DE AD BE EF or DEADBEEF" required>
+              <div class="form-text">Paste UID from UNO serial monitor (spaces allowed).</div>
+            </div>
+            <div class="col-md-6">
+              <label for="username" class="form-label">Student</label>
+              <select id="username" name="username" class="form-select" required>
+                <option value="" selected disabled>Select a student</option>
+                {% for u in users %}
+                  {% if u.role == 'student' %}
+                    <option value="{{ u.username }}">{{ u.username }}</option>
+                  {% endif %}
+                {% endfor %}
+              </select>
+            </div>
+            <div class="col-12 d-flex justify-content-end">
+              <a href="{{ url_for('admin_dashboard') }}" class="btn btn-secondary me-2">
+                <i class="fas fa-arrow-left me-1"></i>Back
+              </a>
+              <button type="submit" class="btn btn-primary">
+                <i class="fas fa-link me-1"></i>Bind Card
+              </button>
+            </div>
+          </form>
+        </div>
+      </div>
+    </div>
+
+    <div class="col-lg-5 mb-3">
+      <div class="card">
+        <div class="card-header d-flex align-items-center justify-content-between">
+          <h5 class="mb-0"><i class="fas fa-list me-2"></i>Existing Mappings</h5>
+          <button id="refreshBtn" class="btn btn-sm btn-outline-secondary"><i class="fas fa-sync me-1"></i>Refresh</button>
+        </div>
+        <div class="card-body">
+          {% if mappings %}
+          <div class="table-responsive">
+            <table class="table table-sm align-middle">
+              <thead>
+                <tr>
+                  <th>UID</th>
+                  <th>Student</th>
+                  <th class="text-end">Action</th>
+                </tr>
+              </thead>
+              <tbody>
+                {% for card, user in mappings %}
+                <tr>
+                  <td><code>{{ card.uid }}</code></td>
+                  <td>{{ user.username }}</td>
+                  <td class="text-end">
+                    <form method="POST" action="{{ url_for('unbind_card') }}" class="d-inline">
+                      <input type="hidden" name="uid" value="{{ card.uid }}">
+                      <button type="submit" class="btn btn-sm btn-outline-danger">
+                        <i class="fas fa-unlink me-1"></i>Unbind
+                      </button>
+                    </form>
+                  </td>
+                </tr>
+                {% endfor %}
+              </tbody>
+            </table>
+          </div>
+          {% else %}
+            <p class="text-muted mb-0">No RFID mappings yet.</p>
+          {% endif %}
+        </div>
+      </div>
+
+      <div class="alert alert-info">
+        <i class="fas fa-info-circle me-2"></i>
+        Scan a card on the UNO and copy its UID from the serial monitor.
+      </div>
+    </div>
+  </div>
+</div>
+
+<script>
+document.getElementById('refreshBtn').addEventListener('click', function(){
+  window.location.reload();
+});
+</script>
+{% endblock %}
+
+

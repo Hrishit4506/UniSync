@@ -1,59 +1,481 @@
 {% extends 'base.html' %} 
+
+{% block title %}Login - UniSync{% endblock %}
+
+{% block breadcrumbs %}
+<nav aria-label="breadcrumb" class="container mt-3">
+  <ol class="breadcrumb">
+    <li class="breadcrumb-item">
+      <a href="{{ url_for('index') }}" class="text-decoration-none">
+        <i class="fas fa-home me-1"></i>Home
+      </a>
+    </li>
+    <li class="breadcrumb-item active" aria-current="page">
+      <i class="fas fa-sign-in-alt me-1"></i>Login
+    </li>
+  </ol>
+</nav>
+{% endblock %}
+
 {% block body %}
 <section class="page-hero">
   <div class="container">
     <div class="row justify-content-center">
       <div class="col-sm-10 col-md-8 col-lg-5">
-        <div class="card p-4 elev-2">
-          <div class="card-body">
-            <div class="text-center mb-3">
-              <div class="mb-2">
-                <span class="badge bg-primary">UniSync</span>
+        <div class="card login-card border-0 elev-4">
+          <div class="card-body p-5">
+            <div class="text-center mb-4">
+              <div class="brand-logo mb-3">
+                <div class="logo-circle">
+                  <i class="fas fa-graduation-cap fa-2x text-primary"></i>
+                </div>
               </div>
-              <h3 class="mb-1">Welcome back</h3>
-              <p class="text-muted mb-0">Sign in to your account</p>
+              <div class="brand-info mb-3">
+                <span class="badge bg-primary fs-6 px-3 py-2">UniSync</span>
+              </div>
+              <h2 class="fw-bold mb-2">Welcome back</h2>
+              <p class="text-muted mb-0">Sign in to your account to continue</p>
             </div>
-            <form method="POST" action="/login" novalidate>
-              <div class="mb-3">
-                <label for="username" class="form-label">Username</label>
-                <input type="text" class="form-control" id="username" name="username" required autocomplete="username" autofocus />
+            
+            <form method="POST" action="/login" novalidate class="login-form">
+              <div class="form-floating mb-4">
+                <input type="text" class="form-control" id="username" name="username" 
+                       placeholder="Username" required autocomplete="username" autofocus />
+                <label for="username">
+                  <i class="fas fa-user me-2"></i>Username
+                </label>
+                <div class="form-feedback"></div>
               </div>
-              <div class="mb-3">
-                <label for="password" class="form-label">Password</label>
-                <input type="password" class="form-control" id="password" name="password" required autocomplete="current-password" />
+              
+              <div class="form-floating mb-4">
+                <input type="password" class="form-control" id="password" name="password" 
+                       placeholder="Password" required autocomplete="current-password" />
+                <label for="password">
+                  <i class="fas fa-lock me-2"></i>Password
+                </label>
+                <div class="form-feedback"></div>
               </div>
-              <button type="submit" class="btn btn-primary w-100 mb-3">
-                <i class="fas fa-right-to-bracket me-2"></i>Login
+              
+              <div class="form-check mb-4">
+                <input class="form-check-input" type="checkbox" id="rememberMe" name="remember">
+                <label class="form-check-label" for="rememberMe">
+                  <i class="fas fa-clock me-2"></i>Remember me for 30 days
+                </label>
+              </div>
+              
+              <button type="submit" class="btn btn-primary w-100 btn-lg mb-4 login-btn">
+                <i class="fas fa-right-to-bracket me-2"></i>Sign In
+                <div class="btn-loading d-none">
+                  <div class="spinner-border spinner-border-sm me-2" role="status">
+                    <span class="visually-hidden">Loading...</span>
+                  </div>
+                  Signing in...
+                </div>
               </button>
-              <p class="text-center text-muted mb-0">
-                <i class="fas fa-circle-info me-1"></i>
-                Contact your administrator to create an account
-              </p>
+              
+              <div class="text-center">
+                <p class="text-muted mb-2">
+                  <i class="fas fa-circle-info me-1"></i>
+                  Contact your administrator to create an account
+                </p>
+                <a href="{{ url_for('index') }}" class="text-decoration-none">
+                  <i class="fas fa-arrow-left me-1"></i>Back to Home
+                </a>
+              </div>
             </form>
-            <script>
-            document.addEventListener('DOMContentLoaded', function () {
-              const usernameInput = document.getElementById('username');
-              const passwordInput = document.getElementById('password');
-              const form = usernameInput ? usernameInput.form : null;
-              if (usernameInput && passwordInput) {
-                usernameInput.addEventListener('keydown', function (e) {
-                  if (e.key === 'Enter') {
-                    e.preventDefault();
-                    passwordInput.focus();
-                  }
-                });
-                passwordInput.addEventListener('keydown', function (e) {
-                  if (e.key === 'Enter' && form) {
-                    if (form.requestSubmit) { form.requestSubmit(); } else { form.submit(); }
-                  }
-                });
-              }
-            });
-            </script>
+          </div>
+        </div>
+        
+        <!-- Additional Info Cards -->
+        <div class="row mt-4">
+          <div class="col-6">
+            <div class="info-card text-center">
+              <i class="fas fa-shield-alt fa-2x text-success mb-2"></i>
+              <h6 class="fw-bold">Secure</h6>
+              <small class="text-muted">Enterprise-grade security</small>
+            </div>
+          </div>
+          <div class="col-6">
+            <div class="info-card text-center">
+              <i class="fas fa-clock fa-2x text-primary mb-2"></i>
+              <h6 class="fw-bold">24/7</h6>
+              <small class="text-muted">Always available</small>
+            </div>
           </div>
         </div>
       </div>
     </div>
   </div>
 </section>
+
+<script>
+document.addEventListener('DOMContentLoaded', function () {
+  const usernameInput = document.getElementById('username');
+  const passwordInput = document.getElementById('password');
+  const form = document.querySelector('.login-form');
+  const loginBtn = document.querySelector('.login-btn');
+  const btnLoading = document.querySelector('.btn-loading');
+  const btnText = loginBtn.querySelector('span') || loginBtn.childNodes[0];
+  
+  if (usernameInput && passwordInput && form) {
+    // Enhanced form validation
+    const inputs = [usernameInput, passwordInput];
+    
+    inputs.forEach(input => {
+      input.addEventListener('focus', function() {
+        this.parentElement.classList.add('focused');
+      });
+      
+      input.addEventListener('blur', function() {
+        if (!this.value) {
+          this.parentElement.classList.remove('focused');
+        }
+        validateField(this);
+      });
+      
+      input.addEventListener('input', function() {
+        if (this.value) {
+          this.parentElement.classList.add('has-value');
+        } else {
+          this.parentElement.classList.remove('has-value');
+        }
+        clearFieldError(this);
+      });
+    });
+    
+    // Form submission with loading state
+    form.addEventListener('submit', function(e) {
+      if (!validateForm()) {
+        e.preventDefault();
+        return;
+      }
+      
+      // Show loading state
+      loginBtn.disabled = true;
+      btnText.style.display = 'none';
+      btnLoading.classList.remove('d-none');
+      
+      // Re-enable after a delay (in case of errors)
+      setTimeout(() => {
+        loginBtn.disabled = false;
+        btnText.style.display = 'inline';
+        btnLoading.classList.add('d-none');
+      }, 5000);
+    });
+    
+    // Keyboard navigation
+    usernameInput.addEventListener('keydown', function (e) {
+      if (e.key === 'Enter') {
+        e.preventDefault();
+        passwordInput.focus();
+      }
+    });
+    
+    passwordInput.addEventListener('keydown', function (e) {
+      if (e.key === 'Enter' && form) {
+        if (form.requestSubmit) { 
+          form.requestSubmit(); 
+        } else { 
+          form.submit(); 
+        }
+      }
+    });
+  }
+  
+  function validateField(field) {
+    const feedback = field.parentElement.querySelector('.form-feedback');
+    let isValid = true;
+    let message = '';
+    
+    if (field.required && !field.value.trim()) {
+      isValid = false;
+      message = 'This field is required';
+    } else if (field.type === 'password' && field.value.length < 1) {
+      isValid = false;
+      message = 'Password is required';
+    }
+    
+    if (!isValid) {
+      showFieldError(field, message);
+    } else {
+      clearFieldError(field);
+    }
+    
+    return isValid;
+  }
+  
+  function validateForm() {
+    let isValid = true;
+    inputs.forEach(input => {
+      if (!validateField(input)) {
+        isValid = false;
+      }
+    });
+    return isValid;
+  }
+  
+  function showFieldError(field, message) {
+    field.classList.add('is-invalid');
+    const feedback = field.parentElement.querySelector('.form-feedback');
+    if (feedback) {
+      feedback.textContent = message;
+      feedback.classList.add('invalid-feedback');
+      feedback.classList.remove('valid-feedback');
+    }
+  }
+  
+  function clearFieldError(field) {
+    field.classList.remove('is-invalid');
+    const feedback = field.parentElement.querySelector('.form-feedback');
+    if (feedback) {
+      feedback.textContent = '';
+      feedback.classList.remove('invalid-feedback', 'valid-feedback');
+    }
+  }
+});
+</script>
+
+<style>
+/* Enhanced Login Styles */
+.login-card {
+  border-radius: var(--radius-lg);
+  backdrop-filter: blur(20px);
+  -webkit-backdrop-filter: blur(20px);
+  background: var(--bg-glass);
+  border: 1px solid color-mix(in oklab, var(--border) 30%, transparent);
+}
+
+.brand-logo {
+  margin-bottom: var(--spacing-md);
+}
+
+.logo-circle {
+  width: 80px;
+  height: 80px;
+  border-radius: 50%;
+  background: linear-gradient(135deg, var(--primary), var(--secondary));
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  margin: 0 auto;
+  color: white;
+  box-shadow: var(--shadow-lg);
+}
+
+.brand-info .badge {
+  font-size: 1rem;
+  font-weight: 600;
+  letter-spacing: 0.5px;
+}
+
+/* Enhanced Form Floating Labels */
+.form-floating {
+  position: relative;
+}
+
+.form-floating .form-control {
+  height: 60px;
+  padding: 1rem 1rem 0.5rem 1rem;
+  font-size: 1rem;
+  border: 2px solid var(--border);
+  border-radius: var(--radius);
+  background: var(--bg-glass);
+  transition: all 0.3s ease;
+}
+
+.form-floating .form-control:focus {
+  border-color: var(--primary);
+  box-shadow: 0 0 0 0.25rem var(--ring);
+  background: var(--bg-elev);
+  transform: translateY(-2px);
+}
+
+.form-floating .form-control:focus + label,
+.form-floating .form-control:not(:placeholder-shown) + label {
+  transform: translateY(-0.5rem) scale(0.85);
+  color: var(--primary);
+  font-weight: 600;
+}
+
+.form-floating label {
+  position: absolute;
+  top: 0;
+  left: 0;
+  height: 100%;
+  padding: 1rem 1rem 0.5rem 1rem;
+  pointer-events: none;
+  border: 1px solid transparent;
+  transform-origin: 0 0;
+  transition: all 0.3s ease;
+  color: var(--muted);
+}
+
+.form-floating .form-control:focus + label {
+  color: var(--primary);
+}
+
+/* Form Validation Styles */
+.form-feedback {
+  font-size: 0.875rem;
+  margin-top: 0.25rem;
+  min-height: 1.25rem;
+}
+
+.invalid-feedback {
+  color: var(--danger);
+  display: block;
+}
+
+.valid-feedback {
+  color: var(--success);
+  display: block;
+}
+
+.form-control.is-invalid {
+  border-color: var(--danger);
+  box-shadow: 0 0 0 0.25rem color-mix(in oklab, var(--danger) 25%, transparent);
+}
+
+.form-control.is-valid {
+  border-color: var(--success);
+  box-shadow: 0 0 0 0.25rem color-mix(in oklab, var(--success) 25%, transparent);
+}
+
+/* Enhanced Checkbox */
+.form-check-input {
+  width: 1.25rem;
+  height: 1.25rem;
+  border: 2px solid var(--border);
+  border-radius: var(--radius-sm);
+  transition: all 0.2s ease;
+}
+
+.form-check-input:checked {
+  background: linear-gradient(135deg, var(--primary), var(--secondary));
+  border-color: var(--primary);
+  transform: scale(1.1);
+}
+
+.form-check-input:focus {
+  box-shadow: 0 0 0 0.25rem var(--ring);
+  border-color: var(--primary);
+}
+
+.form-check-label {
+  color: var(--text);
+  font-weight: 500;
+  cursor: pointer;
+  user-select: none;
+}
+
+/* Enhanced Button */
+.login-btn {
+  height: 56px;
+  font-weight: 600;
+  letter-spacing: 0.5px;
+  position: relative;
+  overflow: hidden;
+  transition: all 0.3s ease;
+}
+
+.login-btn:hover {
+  transform: translateY(-2px);
+  box-shadow: var(--shadow-lg);
+}
+
+.btn-loading {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+}
+
+/* Info Cards */
+.info-card {
+  background: var(--bg-glass);
+  padding: var(--spacing-md);
+  border-radius: var(--radius);
+  border: 1px solid color-mix(in oklab, var(--border) 20%, transparent);
+  transition: all 0.3s ease;
+}
+
+.info-card:hover {
+  transform: translateY(-2px);
+  box-shadow: var(--shadow-md);
+}
+
+.info-card h6 {
+  color: var(--text);
+  margin-bottom: 0.5rem;
+}
+
+.info-card small {
+  font-size: 0.75rem;
+}
+
+/* Enhanced Page Hero */
+.page-hero {
+  background: radial-gradient(1200px 800px at 50% 50%, 
+    color-mix(in oklab, var(--primary) 8%, transparent), 
+    transparent 60%);
+  min-height: 100vh;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  padding: var(--spacing-lg) 0;
+}
+
+/* Responsive Design */
+@media (max-width: 768px) {
+  .login-card {
+    margin: var(--spacing-md);
+  }
+  
+  .card-body {
+    padding: var(--spacing-lg) !important;
+  }
+  
+  .info-card {
+    margin-bottom: var(--spacing-md);
+  }
+}
+
+/* Animation for form elements */
+.form-floating {
+  animation: slideInUp 0.6s ease-out;
+}
+
+.form-floating:nth-child(2) {
+  animation-delay: 0.1s;
+}
+
+.form-check {
+  animation: slideInUp 0.6s ease-out 0.2s both;
+}
+
+.login-btn {
+  animation: slideInUp 0.6s ease-out 0.3s both;
+}
+
+@keyframes slideInUp {
+  from {
+    opacity: 0;
+    transform: translateY(30px);
+  }
+  to {
+    opacity: 1;
+    transform: translateY(0);
+  }
+}
+
+/* Focus states for accessibility */
+.form-control:focus-visible {
+  outline: 2px solid var(--primary);
+  outline-offset: 2px;
+}
+
+.login-btn:focus-visible {
+  outline: 2px solid var(--primary);
+  outline-offset: 2px;
+}
+</style>
 {% endblock body %}

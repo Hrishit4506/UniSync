@@ -1,0 +1,290 @@
+{% extends "base.html" %}
+
+{% block title %}User Management - Admin Dashboard{% endblock %}
+
+{% block breadcrumbs %}
+<nav aria-label="breadcrumb">
+  <ol class="breadcrumb">
+    <li class="breadcrumb-item"><a href="{{ url_for('admin_dashboard') }}">Admin Dashboard</a></li>
+    <li class="breadcrumb-item active" aria-current="page">User Management</li>
+  </ol>
+</nav>
+{% endblock %}
+
+{% block body %}
+<div class="container-fluid">
+  <div class="row">
+    <div class="col-12">
+      <div class="card border-0 elev-3">
+        <div class="card-header bg-primary text-white">
+          <h5 class="mb-0"><i class="fas fa-users me-2"></i>User Management</h5>
+        </div>
+                 <div class="card-body">
+           <!-- Search and Filter -->
+          <div class="row mb-3">
+            <div class="col-md-6">
+              <input type="text" id="userSearch" class="form-control" 
+                     placeholder="Search users by username or role..." onkeyup="filterUsers()">
+            </div>
+            <div class="col-md-6 text-end">
+              <a href="{{ url_for('create_user') }}" class="btn btn-success">
+                <i class="fas fa-user-plus me-2"></i>Create New User
+              </a>
+            </div>
+          </div>
+          
+          <!-- View Toggle -->
+          <div class="row mb-3">
+            <div class="col-12">
+              <div class="btn-group" role="group">
+                <button id="listViewBtn" class="btn btn-primary" onclick="showAllUsers()">
+                  <i class="fas fa-list me-1"></i>List View
+                </button>
+                <button id="gridViewBtn" class="btn btn-outline-secondary" onclick="showUserGrid()">
+                  <i class="fas fa-th me-1"></i>Grid View
+                </button>
+              </div>
+            </div>
+          </div>
+          
+          <!-- User List View -->
+          <div id="userListView">
+            <div class="table-responsive">
+              <table class="table table-hover">
+                <thead>
+                  <tr>
+                    <th>Username</th>
+                    <th>Role</th>
+                    <th>Actions</th>
+                  </tr>
+                </thead>
+                                 <tbody>
+                   {% for user in users %}
+                   <tr class="user-item" data-username="{{ user.username }}" data-role="{{ user.role }}">
+                    <td>
+                      <strong>{{ user.username }}</strong>
+                    </td>
+                    <td>
+                      <span class="badge bg-secondary">{{ user.role|title }}</span>
+                    </td>
+                    <td>
+                      <div class="btn-group btn-group-sm">
+                        <a href="{{ url_for('admin_manage_images', username=user.username) }}" 
+                           class="btn btn-outline-primary" title="Manage Images">
+                          <i class="fas fa-camera"></i>
+                        </a>
+                        <a href="{{ url_for('edit_user', user_id=user.id) }}" 
+                           class="btn btn-outline-secondary" title="Edit User">
+                          <i class="fas fa-edit"></i>
+                        </a>
+                        <button onclick="confirmDelete({{ user.id }}, '{{ user.username }}')" 
+                                class="btn btn-outline-danger" title="Delete User">
+                          <i class="fas fa-trash"></i>
+                        </button>
+                      </div>
+                    </td>
+                  </tr>
+                  {% endfor %}
+                </tbody>
+              </table>
+            </div>
+          </div>
+          
+          <!-- User Grid View (Hidden by default) -->
+          <div id="userGridView" style="display: none;">
+            <div class="row g-3">
+              {% for user in users %}
+              <div class="col-sm-6 col-md-4 col-lg-3 user-item" data-username="{{ user.username }}" data-role="{{ user.role }}">
+                <div class="card border-0 elev-2 h-100">
+                  <div class="card-body text-center d-flex flex-column">
+                    <div class="mb-3 flex-grow-1 d-flex align-items-center justify-content-center">
+                      <i class="fas fa-user-circle fa-3x text-primary"></i>
+                    </div>
+                    <h6 class="card-title mb-2">{{ user.username }}</h6>
+                    <span class="badge bg-secondary mb-3">{{ user.role|title }}</span>
+                    <div class="btn-group btn-group-sm w-100 mt-auto">
+                      <a href="{{ url_for('admin_manage_images', username=user.username) }}" 
+                         class="btn btn-outline-primary" title="Manage Images">
+                        <i class="fas fa-camera"></i>
+                      </a>
+                      <a href="{{ url_for('edit_user', user_id=user.id) }}" 
+                         class="btn btn-outline-secondary" title="Edit User">
+                        <i class="fas fa-edit"></i>
+                      </a>
+                      <button onclick="confirmDelete({{ user.id }}, '{{ user.username }}')" 
+                              class="btn btn-outline-danger" title="Delete User">
+                        <i class="fas fa-trash"></i>
+                      </button>
+                    </div>
+                  </div>
+                </div>
+              </div>
+              {% endfor %}
+            </div>
+          </div>
+        </div>
+      </div>
+    </div>
+  </div>
+</div>
+
+<!-- Delete Confirmation Modal -->
+<div class="modal fade" id="deleteModal" tabindex="-1" aria-labelledby="deleteModalLabel" aria-hidden="true">
+  <div class="modal-dialog">
+    <div class="modal-content">
+      <div class="modal-header">
+        <h5 class="modal-title" id="deleteModalLabel">Confirm Delete</h5>
+        <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Close"></button>
+      </div>
+      <div class="modal-body">
+        <p>Are you sure you want to delete the user <strong id="deleteUserName"></strong>?</p>
+        <p class="text-danger"><small>This action cannot be undone.</small></p>
+      </div>
+      <div class="modal-footer">
+        <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">Cancel</button>
+        <form id="deleteForm" method="POST">
+          <button type="submit" class="btn btn-danger">Delete User</button>
+        </form>
+      </div>
+    </div>
+  </div>
+</div>
+{% endblock %}
+
+{% block scripts %}
+<script>
+// User Management Functions
+let currentView = 'list';
+
+// Initialize when page loads
+document.addEventListener('DOMContentLoaded', function() {
+  showAllUsers();
+});
+
+function showAllUsers() {
+  const listView = document.getElementById('userListView');
+  const gridView = document.getElementById('userGridView');
+  const listBtn = document.getElementById('listViewBtn');
+  const gridBtn = document.getElementById('gridViewBtn');
+  
+  if (listView && gridView && listBtn && gridBtn) {
+    // Show list view
+    listView.style.display = 'block';
+    gridView.style.display = 'none';
+    
+    // Update button states
+    listBtn.className = 'btn btn-primary';
+    gridBtn.className = 'btn btn-outline-secondary';
+    
+    currentView = 'list';
+    
+    // Reapply search filter if there's a search term
+    const searchTerm = document.getElementById('userSearch').value;
+    if (searchTerm) {
+      filterUsers();
+    }
+  }
+}
+
+function showUserGrid() {
+  const listView = document.getElementById('userListView');
+  const gridView = document.getElementById('userGridView');
+  const listBtn = document.getElementById('listViewBtn');
+  const gridBtn = document.getElementById('gridViewBtn');
+  
+  if (listView && gridView && listBtn && gridBtn) {
+    // Show grid view
+    listView.style.display = 'none';
+    gridView.style.display = 'block';
+    
+    // Update button states
+    listBtn.className = 'btn btn-outline-primary';
+    gridBtn.className = 'btn btn-primary';
+    
+    currentView = 'grid';
+    
+    // Reapply search filter if there's a search term
+    const searchTerm = document.getElementById('userSearch').value;
+    if (searchTerm) {
+      filterUsers();
+    }
+  }
+}
+
+function filterUsers() {
+  const searchInput = document.getElementById('userSearch');
+  if (!searchInput) return;
+  
+  const searchTerm = searchInput.value.toLowerCase().trim();
+  
+  // Get user items from the currently visible view
+  const listView = document.getElementById('userListView');
+  const gridView = document.getElementById('userGridView');
+  let userItems;
+  
+  if (currentView === 'list') {
+    userItems = listView.querySelectorAll('.user-item');
+  } else {
+    userItems = gridView.querySelectorAll('.user-item');
+  }
+  
+  userItems.forEach(item => {
+    const username = item.getAttribute('data-username') ? item.getAttribute('data-username').toLowerCase() : '';
+    const role = item.getAttribute('data-role') ? item.getAttribute('data-role').toLowerCase() : '';
+    
+    if (searchTerm === '' || username.includes(searchTerm) || role.includes(searchTerm)) {
+      item.style.display = '';
+    } else {
+      item.style.display = 'none';
+    }
+  });
+}
+
+// Delete user function
+function confirmDelete(userId, username) {
+  document.getElementById("deleteUserName").textContent = username;
+  document.getElementById("deleteForm").action = "{{ url_for('delete_user', user_id=0) }}".replace("0", userId);
+  const modal = new bootstrap.Modal(document.getElementById("deleteModal"));
+  modal.show();
+}
+
+// Handle delete form submission
+document.getElementById("deleteForm").addEventListener("submit", function(e) {
+  e.preventDefault();
+  
+  const form = this;
+  const submitBtn = form.querySelector('button[type="submit"]');
+  const originalText = submitBtn.innerHTML;
+  
+  // Show loading state
+  submitBtn.disabled = true;
+  submitBtn.innerHTML = '<i class="fas fa-spinner fa-spin me-2"></i>Deleting...';
+  
+  // Submit the form
+  fetch(form.action, {
+    method: 'POST',
+    headers: {
+      'Content-Type': 'application/x-www-form-urlencoded',
+    },
+    body: new FormData(form)
+  })
+  .then(response => {
+    if (response.ok) {
+      // Close modal and refresh page to show updated user list
+      const modal = bootstrap.Modal.getInstance(document.getElementById("deleteModal"));
+      modal.hide();
+      window.location.href = window.location.href;
+    } else {
+      throw new Error(`Delete failed with status: ${response.status}`);
+    }
+  })
+  .catch(error => {
+    console.error('Error deleting user:', error);
+    alert('Error deleting user. Please try again.');
+    submitBtn.disabled = false;
+    submitBtn.innerHTML = originalText;
+  });
+});
+</script>
+{% endblock %}
+

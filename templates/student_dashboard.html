@@ -45,6 +45,18 @@
                 </div>
             </div>
 
+            {% if active_session %}
+            <div class="alert alert-success d-flex align-items-center" role="alert">
+                <i class="fas fa-desktop me-2"></i>
+                <div>
+                    <strong>Active Lab Session</strong><br>
+                    Computer: <span class="badge bg-primary">{{ active_session.pc_name }}</span>
+                    &nbsp; Password: <code>{{ active_session.password }}</code>
+                    &nbsp; Started: {{ active_session.start_time.strftime('%Y-%m-%d %H:%M') }}
+                </div>
+            </div>
+            {% endif %}
+
             <!-- Recent Attendance Records -->
             <div class="card">
                 <div class="card-header">

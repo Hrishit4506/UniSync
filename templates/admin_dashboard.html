@@ -1,9 +1,28 @@
-{% extends "base.html" %} {% block body %}
+{% extends "base.html" %} 
+
+{% block title %}Admin Dashboard - UniSync{% endblock %}
+
+{% block breadcrumbs %}
+<nav aria-label="breadcrumb" class="container mt-3">
+  <ol class="breadcrumb">
+    <li class="breadcrumb-item">
+      <a href="{{ url_for('index') }}" class="text-decoration-none">
+        <i class="fas fa-home me-1"></i>Home
+      </a>
+    </li>
+    <li class="breadcrumb-item active" aria-current="page">
+      <i class="fas fa-tachometer-alt me-1"></i>Admin Dashboard
+    </li>
+  </ol>
+</nav>
+{% endblock %}
+
+{% block body %}
 <div class="container-fluid mt-4">
   <div class="row">
     <!-- Main Facial Recognition Section -->
     <div class="col-lg-8">
-      <div class="card">
+      <div class="card border-0 elev-3">
         <div class="card-header bg-primary text-white">
           <h3 class="mb-0">
             <i class="fas fa-camera me-2"></i>UniSync Card - Live Facial Recognition
@@ -55,7 +74,7 @@
       <!-- Facial Recognition Controls -->
       <div class="row mt-3">
         <div class="col-md-6">
-          <div class="card">
+          <div class="card border-0 elev-2">
             <div class="card-header">
               <h5 class="mb-0"><i class="fas fa-cogs me-2"></i>Recognition Controls</h5>
             </div>
@@ -82,7 +101,7 @@
         </div>
         
         <div class="col-md-6">
-          <div class="card">
+          <div class="card border-0 elev-2">
             <div class="card-header">
               <h5 class="mb-0"><i class="fas fa-chart-line me-2"></i>Today's Attendance</h5>
             </div>
@@ -96,15 +115,18 @@
       </div>
     </div>
 
-    <!-- Sidebar - User Management -->
+    <!-- Sidebar - Quick Actions -->
     <div class="col-lg-4">
-      <div class="card">
-        <div class="card-header bg-secondary text-white">
-          <h5 class="mb-0"><i class="fas fa-users me-2"></i>User Management</h5>
+      <div class="card border-0 elev-3">
+        <div class="card-header bg-primary text-white">
+          <h5 class="mb-0"><i class="fas fa-tools me-2"></i>Quick Actions</h5>
         </div>
         <div class="card-body">
           <div class="d-grid gap-2 mb-3">
-            <a href="{{ url_for('create_user') }}" class="btn btn-primary">
+            <a href="{{ url_for('admin_user_management') }}" class="btn btn-primary">
+              <i class="fas fa-users me-2"></i>User Management
+            </a>
+            <a href="{{ url_for('create_user') }}" class="btn btn-success">
               <i class="fas fa-user-plus me-2"></i>Create New User
             </a>
             <a href="{{ url_for('mark_attendance') }}" class="btn btn-outline-secondary">
@@ -112,6 +134,9 @@
             </a>
             <a href="{{ url_for('admin_streaming_settings') }}" class="btn btn-outline-info">
               <i class="fas fa-cog me-2"></i>Streaming Settings
+            </a>
+            <a href="{{ url_for('admin_rfid') }}" class="btn btn-outline-success">
+              <i class="fas fa-id-card me-2"></i>RFID Management
             </a>
             <a href="{{ url_for('admin_holidays') }}" class="btn btn-outline-warning">
               <i class="fas fa-calendar-day me-2"></i>Manage Holidays
@@ -138,40 +163,61 @@
         </div>
       </div>
 
-      <!-- Quick User Actions -->
-      <div class="card mt-3">
+
+
+      <!-- Enhanced User Records Access -->
+      <div class="card mt-3 border-0 elev-2">
         <div class="card-header">
-          <h6 class="mb-0"><i class="fas fa-user-cog me-2"></i>Quick Actions</h6>
+          <h6 class="mb-0"><i class="fas fa-database me-2"></i>User Records Access</h6>
         </div>
         <div class="card-body">
-          <div class="list-group list-group-flush">
-            {% for user in users[:5] %}
-            <div class="list-group-item d-flex justify-content-between align-items-center">
-              <div>
-                <strong>{{ user.username }}</strong>
-                <br><small class="text-muted">{{ user.role|title }}</small>
-              </div>
-              <div class="btn-group btn-group-sm">
-                <a href="{{ url_for('admin_manage_images', username=user.username) }}" 
-                   class="btn btn-outline-primary btn-sm" title="Manage Images">
-                  <i class="fas fa-camera"></i>
-                </a>
-                <a href="{{ url_for('edit_user', user_id=user.id) }}" 
-                   class="btn btn-outline-secondary btn-sm" title="Edit User">
-                  <i class="fas fa-edit"></i>
-                </a>
-                <button onclick="confirmDelete({{ user.id }}, '{{ user.username }}')" 
-                        class="btn btn-outline-danger btn-sm" title="Delete User">
-                  <i class="fas fa-trash"></i>
-                </button>
-              </div>
-            </div>
-            {% endfor %}
-            {% if users|length > 5 %}
-            <div class="list-group-item text-center">
-              <small class="text-muted">+{{ users|length - 5 }} more users</small>
-            </div>
-            {% endif %}
+          <div class="mb-3">
+            <label for="userSelect" class="form-label">Select User:</label>
+            <select class="form-select" id="userSelect">
+              <option value="">Choose a user...</option>
+              {% for user in users %}
+              <option value="{{ user.id }}">{{ user.username }} ({{ user.role|title }})</option>
+              {% endfor %}
+            </select>
+          </div>
+          
+          <div class="d-grid gap-2">
+            <button id="viewRecordsBtn" class="btn btn-outline-primary btn-sm" disabled>
+              <i class="fas fa-eye me-2"></i>View Attendance Records
+            </button>
+            <button id="exportRecordsBtn" class="btn btn-outline-success btn-sm" disabled>
+              <i class="fas fa-download me-2"></i>Export Records
+            </button>
+            <button id="modifyRecordsBtn" class="btn btn-outline-warning btn-sm" disabled>
+              <i class="fas fa-edit me-2"></i>Modify Records
+            </button>
+          </div>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <!-- Enhanced User Records Section -->
+  <div class="row mt-4" id="userRecordsSection" style="display: none;">
+    <div class="col-12">
+      <div class="card border-0 elev-3">
+        <div class="card-header d-flex justify-content-between align-items-center">
+          <h5 class="mb-0">
+            <i class="fas fa-user-clock me-2"></i>
+            Attendance Records for <span id="selectedUserName"></span>
+          </h5>
+          <div>
+            <button id="refreshRecordsBtn" class="btn btn-outline-primary btn-sm">
+              <i class="fas fa-sync me-2"></i>Refresh
+            </button>
+            <button id="closeRecordsBtn" class="btn btn-outline-secondary btn-sm">
+              <i class="fas fa-times me-2"></i>Close
+            </button>
+          </div>
+        </div>
+        <div class="card-body">
+          <div id="userRecordsContent">
+            <p class="text-muted">Loading user records...</p>
           </div>
         </div>
       </div>
@@ -201,7 +247,223 @@
   </div>
 </div>
 
+<!-- User Records Modal -->
+<div class="modal fade" id="userRecordsModal" tabindex="-1" aria-labelledby="userRecordsModalLabel" aria-hidden="true">
+  <div class="modal-dialog modal-xl">
+    <div class="modal-content">
+      <div class="modal-header">
+        <h5 class="modal-title" id="userRecordsModalLabel">User Attendance Records</h5>
+        <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Close"></button>
+      </div>
+      <div class="modal-body">
+        <div id="modalRecordsContent">
+          <!-- Records will be loaded here -->
+        </div>
+      </div>
+      <div class="modal-footer">
+        <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">Close</button>
+        <button type="button" class="btn btn-primary" id="exportModalRecords">Export</button>
+      </div>
+    </div>
+  </div>
+</div>
+
 <script>
+// Enhanced User Management
+let selectedUserId = null;
+let selectedUserName = '';
+
+// User selection handler
+document.getElementById('userSelect').addEventListener('change', function() {
+  const userId = this.value;
+  const buttons = ['viewRecordsBtn', 'exportRecordsBtn', 'modifyRecordsBtn'];
+  
+  if (userId) {
+    selectedUserId = userId;
+    selectedUserName = this.options[this.selectedIndex].text;
+    buttons.forEach(btnId => {
+      document.getElementById(btnId).disabled = false;
+    });
+  } else {
+    selectedUserId = null;
+    selectedUserName = '';
+    buttons.forEach(btnId => {
+      document.getElementById(btnId).disabled = true;
+    });
+    document.getElementById('userRecordsSection').style.display = 'none';
+  }
+});
+
+// View Records Button
+document.getElementById('viewRecordsBtn').addEventListener('click', function() {
+  if (selectedUserId) {
+    loadUserRecords(selectedUserId);
+    document.getElementById('userRecordsSection').style.display = 'block';
+    document.getElementById('selectedUserName').textContent = selectedUserName;
+  }
+});
+
+// Export Records Button
+document.getElementById('exportRecordsBtn').addEventListener('click', function() {
+  if (selectedUserId) {
+    exportUserRecords(selectedUserId);
+  }
+});
+
+// Modify Records Button
+document.getElementById('modifyRecordsBtn').addEventListener('click', function() {
+  if (selectedUserId) {
+    showModifyRecordsModal(selectedUserId);
+  }
+});
+
+// Refresh Records Button
+document.getElementById('refreshRecordsBtn').addEventListener('click', function() {
+  if (selectedUserId) {
+    loadUserRecords(selectedUserId);
+  }
+});
+
+// Close Records Button
+document.getElementById('closeRecordsBtn').addEventListener('click', function() {
+  document.getElementById('userRecordsSection').style.display = 'none';
+});
+
+// Load user records
+function loadUserRecords(userId) {
+  const contentDiv = document.getElementById('userRecordsContent');
+  contentDiv.innerHTML = '<p class="text-muted">Loading user records...</p>';
+  
+  fetch(`/admin/get_user_records/${userId}`)
+    .then(response => response.json())
+    .then(data => {
+      if (data.success) {
+        displayUserRecords(data.records, data.user_info);
+      } else {
+        contentDiv.innerHTML = `<p class="text-danger">Error: ${data.message}</p>`;
+      }
+    })
+    .catch(error => {
+      console.error('Error loading user records:', error);
+      contentDiv.innerHTML = '<p class="text-danger">Error loading user records</p>';
+    });
+}
+
+// Display user records
+function displayUserRecords(records, userInfo) {
+  const contentDiv = document.getElementById('userRecordsContent');
+  
+  let html = `
+    <div class="row mb-3">
+      <div class="col-md-6">
+        <h6>User Information</h6>
+        <p><strong>Username:</strong> ${userInfo.username}</p>
+        <p><strong>Role:</strong> ${userInfo.role}</p>
+        <p><strong>Total Records:</strong> ${records.length}</p>
+      </div>
+      <div class="col-md-6">
+        <h6>Quick Actions</h6>
+
+      </div>
+    </div>
+  `;
+  
+  if (records.length > 0) {
+    html += `
+      <div class="table-responsive">
+        <table class="table table-hover">
+          <thead>
+            <tr>
+              <th>Date</th>
+              <th>Time</th>
+              <th>Type</th>
+              <th>Method</th>
+              <th>Actions</th>
+            </tr>
+          </thead>
+          <tbody>
+    `;
+    
+    records.forEach(record => {
+      const date = new Date(record.timestamp).toLocaleDateString();
+      const time = new Date(record.timestamp).toLocaleTimeString();
+      
+      html += `
+        <tr>
+          <td>${date}</td>
+          <td>${time}</td>
+          <td>
+            <span class="badge bg-success">Present</span>
+          </td>
+          <td>${record.method || 'Facial Recognition'}</td>
+          <td>
+
+            <button class="btn btn-outline-danger btn-sm" onclick="deleteRecord(${record.id})">
+              <i class="fas fa-trash"></i>
+            </button>
+          </td>
+        </tr>
+      `;
+    });
+    
+    html += `
+          </tbody>
+        </table>
+      </div>
+    `;
+  } else {
+    html += '<p class="text-muted">No attendance records found for this user.</p>';
+  }
+  
+  contentDiv.innerHTML = html;
+}
+
+// Export user records
+function exportUserRecords(userId) {
+  fetch(`/admin/export_user_records/${userId}`)
+    .then(response => response.blob())
+    .then(blob => {
+      const url = window.URL.createObjectURL(blob);
+      const a = document.createElement('a');
+      a.href = url;
+      a.download = `user_records_${userId}.csv`;
+      document.body.appendChild(a);
+      a.click();
+      window.URL.revokeObjectURL(url);
+      document.body.removeChild(a);
+    })
+    .catch(error => {
+      console.error('Error exporting records:', error);
+      alert('Error exporting records');
+    });
+}
+
+
+
+// Delete individual record
+function deleteRecord(recordId) {
+  if (confirm('Are you sure you want to delete this record?')) {
+    fetch(`/admin/delete_record/${recordId}`, {
+      method: 'DELETE'
+    })
+    .then(response => response.json())
+    .then(data => {
+      if (data.success) {
+        // Refresh the records display
+        if (selectedUserId) {
+          loadUserRecords(selectedUserId);
+        }
+      } else {
+        alert('Error deleting record: ' + data.message);
+      }
+    })
+    .catch(error => {
+      console.error('Error deleting record:', error);
+      alert('Error deleting record');
+    });
+  }
+}
+
 // Facial Recognition Status Updates
 function updateRecognitionStatus() {
   fetch('/get_recognition_status')
@@ -433,55 +695,6 @@ setInterval(loadTodayAttendance, 30000);
 updateRecognitionStatus();
 loadTodayAttendance();
 
-// Delete user function
-function confirmDelete(userId, username) {
-  document.getElementById("deleteUserName").textContent = username;
-  document.getElementById("deleteForm").action = "{{ url_for('delete_user', user_id=0) }}".replace("0", userId);
-  const modal = new bootstrap.Modal(document.getElementById("deleteModal"));
-  modal.show();
-}
 
-// Handle delete form submission
-document.getElementById("deleteForm").addEventListener("submit", function(e) {
-  e.preventDefault();
-  
-  const form = this;
-  const submitBtn = form.querySelector('button[type="submit"]');
-  const originalText = submitBtn.innerHTML;
-  
-  // Show loading state
-  submitBtn.disabled = true;
-  submitBtn.innerHTML = '<i class="fas fa-spinner fa-spin me-2"></i>Deleting...';
-  
-  console.log('Deleting user from:', form.action);
-  
-  // Submit the form
-  fetch(form.action, {
-    method: 'POST',
-    headers: {
-      'Content-Type': 'application/x-www-form-urlencoded',
-    },
-    body: new FormData(form)
-  })
-  .then(response => {
-    console.log('Delete response status:', response.status);
-    if (response.ok) {
-      // Close modal and refresh page to show updated user list
-      const modal = bootstrap.Modal.getInstance(document.getElementById("deleteModal"));
-      modal.hide();
-      console.log('User deleted successfully, refreshing page...');
-      // Force a hard refresh to clear any cache
-      window.location.href = window.location.href;
-    } else {
-      throw new Error(`Delete failed with status: ${response.status}`);
-    }
-  })
-  .catch(error => {
-    console.error('Error deleting user:', error);
-    alert('Error deleting user. Please try again.');
-    submitBtn.disabled = false;
-    submitBtn.innerHTML = originalText;
-  });
-});
 </script>
 {% endblock %}
